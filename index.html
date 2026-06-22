@@ -1,0 +1,2092 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="来呀！赛车">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a1a2e">
+<meta name="format-detection" content="telephone=no">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏎️</text></svg>">
+<title>Come on! Racing - 来呀！赛车</title>
+<style>
+:root {
+  --vh: 1vh;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  font-family: 'Arial', 'Microsoft YaHei', sans-serif;
+  background: #1a1a2e;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  position: fixed;
+}
+canvas { display: block; }
+.screen {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  height: 100dvh;
+  display: none; flex-direction: column; align-items: center;
+  z-index: 10;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+}
+.screen.active { display: flex; }
+
+/* ===== Main Menu ===== */
+#menuScreen {
+  background: linear-gradient(180deg, #87CEEB 0%, #87CEEB 55%, #4a7c59 55%, #3d6b4e 100%);
+  justify-content: flex-end;
+  padding-bottom: 20px;
+}
+.menu-sky {
+  position: absolute; top: 0; left: 0; width: 100%; height: 55%;
+  overflow: hidden;
+}
+.menu-road {
+  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 60%; height: 55%;
+  background: #555;
+  clip-path: polygon(35% 0%, 65% 0%, 100% 100%, 0% 100%);
+}
+.menu-road::before {
+  content: '';
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 4px; height: 100%;
+  background: repeating-linear-gradient(to bottom, #fff 0px, #fff 20px, transparent 20px, transparent 40px);
+}
+.menu-car-display {
+  position: absolute; bottom: 30%; left: 50%; transform: translateX(-50%);
+  z-index: 2;
+}
+.menu-title {
+  position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.5); color: #fff; padding: 8px 30px;
+  border-radius: 20px; font-size: 22px; font-weight: bold;
+  letter-spacing: 3px; z-index: 5;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+.menu-stats {
+  position: absolute; top: 60px; right: 15px;
+  display: flex; flex-direction: column; gap: 8px; z-index: 5;
+}
+.stat-badge {
+  background: rgba(0,0,0,0.6); color: #fff; padding: 5px 15px;
+  border-radius: 15px; font-size: 14px; display: flex; align-items: center; gap: 6px;
+}
+.stat-badge .icon { font-size: 18px; }
+.menu-buttons {
+  position: absolute; bottom: 10px; left: 0; width: 100%;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+  padding: 0 10px; z-index: 5;
+}
+.menu-btn {
+  padding: 10px 18px; border: none; border-radius: 25px;
+  font-size: 14px; font-weight: bold; cursor: pointer;
+  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.menu-btn:active { transform: scale(0.95); box-shadow: 0 1px 5px rgba(0,0,0,0.3); }
+.btn-start { background: linear-gradient(135deg, #e74c3c, #c0392b); font-size: 18px; padding: 12px 35px; }
+.btn-garage { background: linear-gradient(135deg, #3498db, #2980b9); }
+.btn-shop { background: linear-gradient(135deg, #f39c12, #e67e22); }
+.btn-bank { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+.btn-reward { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+.btn-mission { background: linear-gradient(135deg, #1abc9c, #16a085); }
+.btn-settings { background: linear-gradient(135deg, #95a5a6, #7f8c8d); }
+
+/* ===== Game HUD ===== */
+#gameScreen { background: #555; }
+#gameCanvas { position: absolute; top: 0; left: 0; }
+.game-hud {
+  position: absolute; top: 0; left: 0; width: 100%; z-index: 20;
+  pointer-events: none;
+}
+.hud-top {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 10px 15px;
+}
+.hud-left { display: flex; flex-direction: column; gap: 5px; }
+.hud-right { display: flex; flex-direction: column; gap: 5px; align-items: flex-end; }
+.hud-item {
+  background: rgba(0,0,0,0.6); color: #fff; padding: 4px 12px;
+  border-radius: 12px; font-size: 13px; display: flex; align-items: center; gap: 5px;
+}
+.hud-speed {
+  font-size: 24px; font-weight: bold; color: #0f0;
+  background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 15px;
+}
+.hud-powerups {
+  position: absolute; top: 80px; right: 15px;
+  display: flex; flex-direction: column; gap: 8px;
+  pointer-events: auto;
+}
+.powerup-btn {
+  width: 50px; height: 50px; border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.5);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; cursor: pointer;
+  position: relative; overflow: hidden;
+}
+.powerup-btn .count {
+  position: absolute; bottom: -2px; right: -2px;
+  background: #e74c3c; color: #fff; font-size: 11px;
+  width: 18px; height: 18px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: bold;
+}
+.powerup-btn.active { border-color: #0f0; box-shadow: 0 0 15px rgba(0,255,0,0.5); }
+.pu-magnet { background: rgba(231,76,60,0.8); }
+.pu-shield { background: rgba(52,152,219,0.8); }
+.pu-fuel { background: rgba(241,196,15,0.8); }
+.pu-thunder { background: rgba(155,89,182,0.8); }
+
+.hud-bottom {
+  position: absolute; bottom: 15px; left: 0; width: 100%;
+  display: flex; justify-content: space-between; padding: 0 15px;
+  pointer-events: auto;
+}
+.hud-pause {
+  background: rgba(0,0,0,0.6); color: #fff; border: none;
+  width: 44px; height: 44px; border-radius: 50%;
+  font-size: 20px; cursor: pointer;
+}
+.fuel-bar-container {
+  width: 120px; height: 20px; background: rgba(0,0,0,0.6);
+  border-radius: 10px; overflow: hidden; position: relative;
+}
+.fuel-bar {
+  height: 100%; background: linear-gradient(90deg, #e74c3c, #f39c12, #2ecc71);
+  border-radius: 10px; transition: width 0.3s;
+}
+.fuel-label {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  color: #fff; font-size: 11px; font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+/* ===== Garage ===== */
+#garageScreen {
+  background: linear-gradient(180deg, #2c3e50, #1a252f);
+  padding: 20px;
+}
+.garage-header {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 0; margin-bottom: 15px;
+}
+.garage-title { color: #fff; font-size: 24px; font-weight: bold; }
+.back-btn {
+  background: rgba(255,255,255,0.15); color: #fff; border: none;
+  padding: 8px 20px; border-radius: 20px; font-size: 14px; cursor: pointer;
+}
+.back-btn:active { background: rgba(255,255,255,0.25); }
+.garage-display {
+  width: 100%; flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 20px;
+}
+.garage-car-preview {
+  width: 200px; height: 280px; display: flex; align-items: center;
+  justify-content: center;
+}
+.garage-car-name { color: #fff; font-size: 20px; font-weight: bold; }
+.garage-car-stats {
+  display: flex; gap: 15px; flex-wrap: wrap; justify-content: center;
+}
+.garage-stat {
+  background: rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 10px;
+  color: #fff; font-size: 13px; text-align: center;
+}
+.garage-stat-val { font-size: 18px; font-weight: bold; color: #f39c12; }
+.garage-nav {
+  display: flex; gap: 15px; align-items: center; margin: 15px 0;
+}
+.garage-arrow {
+  background: rgba(255,255,255,0.15); color: #fff; border: none;
+  width: 44px; height: 44px; border-radius: 50%; font-size: 22px;
+  cursor: pointer;
+}
+.garage-arrow:active { background: rgba(255,255,255,0.3); }
+.garage-dots { display: flex; gap: 8px; }
+.garage-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+}
+.garage-dot.active { background: #f39c12; }
+.garage-select-btn {
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+  color: #fff; border: none; padding: 12px 40px; border-radius: 25px;
+  font-size: 16px; font-weight: bold; cursor: pointer;
+}
+.garage-select-btn:active { transform: scale(0.95); }
+.garage-select-btn.owned { background: linear-gradient(135deg, #3498db, #2980b9); }
+.garage-price { color: #f39c12; font-size: 14px; margin-top: 5px; }
+
+/* ===== Shop ===== */
+#shopScreen {
+  background: linear-gradient(180deg, #1a1a2e, #16213e);
+  padding: 20px;
+}
+.shop-header {
+  width: 100%; display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 15px;
+}
+.shop-title { color: #fff; font-size: 24px; font-weight: bold; }
+.shop-coins {
+  background: rgba(255,255,255,0.1); padding: 5px 15px;
+  border-radius: 15px; color: #f39c12; font-size: 16px; font-weight: bold;
+}
+.shop-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+  width: 100%; flex: 1; overflow-y: auto; padding-bottom: 20px;
+  align-content: start;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.shop-item {
+  background: rgba(255,255,255,0.08); border-radius: 15px;
+  padding: 15px; display: flex; flex-direction: column;
+  align-items: center; gap: 8px;
+}
+.shop-item-icon { font-size: 40px; }
+.shop-item-name { color: #fff; font-size: 14px; font-weight: bold; }
+.shop-item-desc { color: rgba(255,255,255,0.6); font-size: 11px; text-align: center; }
+.shop-buy-btn {
+  background: linear-gradient(135deg, #f39c12, #e67e22);
+  color: #fff; border: none; padding: 6px 20px; border-radius: 15px;
+  font-size: 13px; font-weight: bold; cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+}
+.shop-buy-btn:active { transform: scale(0.95); }
+.shop-buy-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ===== Bank / Lottery ===== */
+#bankScreen {
+  background: linear-gradient(180deg, #2c1654, #1a0a3e);
+  padding: 20px;
+}
+.bank-header {
+  width: 100%; display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 15px;
+}
+.bank-title { color: #fff; font-size: 24px; font-weight: bold; }
+.bank-machine {
+  width: 100%; flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 20px;
+}
+.bank-display {
+  width: 200px; height: 200px; background: rgba(0,0,0,0.3);
+  border-radius: 20px; border: 3px solid #9b59b6;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 60px; position: relative; overflow: hidden;
+}
+.bank-display.spinning .bank-reel {
+  animation: spin 0.1s linear infinite;
+}
+@keyframes spin {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+.bank-result {
+  color: #f39c12; font-size: 20px; font-weight: bold;
+  min-height: 30px; text-align: center;
+}
+.bank-buttons {
+  display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
+}
+.bank-bet-btn {
+  padding: 12px 25px; border: none; border-radius: 25px;
+  font-size: 15px; font-weight: bold; cursor: pointer; color: #fff;
+  display: flex; align-items: center; gap: 6px;
+}
+.bet-small { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+.bet-medium { background: linear-gradient(135deg, #f39c12, #e67e22); }
+.bet-large { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+.bank-bet-btn:active { transform: scale(0.95); }
+
+/* ===== Reward ===== */
+#rewardScreen {
+  background: linear-gradient(180deg, #0a3d2e, #062a1e);
+  padding: 20px;
+}
+.reward-header {
+  width: 100%; display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 15px;
+}
+.reward-title { color: #fff; font-size: 24px; font-weight: bold; }
+.reward-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  width: 100%; margin-top: 20px;
+}
+.reward-day {
+  background: rgba(255,255,255,0.08); border-radius: 12px;
+  padding: 12px 8px; display: flex; flex-direction: column;
+  align-items: center; gap: 5px; cursor: pointer;
+  border: 2px solid transparent;
+}
+.reward-day.claimed { border-color: #2ecc71; opacity: 0.6; }
+.reward-day.available { border-color: #f39c12; animation: pulse 1.5s infinite; }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(243,156,18,0.3); }
+  50% { box-shadow: 0 0 15px rgba(243,156,18,0.6); }
+}
+.reward-day-num { color: rgba(255,255,255,0.5); font-size: 11px; }
+.reward-icon { font-size: 28px; }
+.reward-amount { color: #f39c12; font-size: 13px; font-weight: bold; }
+
+/* ===== Mission ===== */
+#missionScreen {
+  background: linear-gradient(180deg, #1a2a3a, #0d1b2a);
+  padding: 20px;
+}
+.mission-header {
+  width: 100%; display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 15px;
+}
+.mission-title { color: #fff; font-size: 24px; font-weight: bold; }
+.mission-list {
+  width: 100%; flex: 1; overflow-y: auto; display: flex;
+  flex-direction: column; gap: 10px;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.mission-item {
+  background: rgba(255,255,255,0.08); border-radius: 12px;
+  padding: 15px; display: flex; align-items: center; gap: 12px;
+}
+.mission-icon { font-size: 32px; }
+.mission-info { flex: 1; }
+.mission-name { color: #fff; font-size: 14px; font-weight: bold; }
+.mission-desc { color: rgba(255,255,255,0.5); font-size: 12px; margin-top: 3px; }
+.mission-progress-bar {
+  width: 100%; height: 6px; background: rgba(255,255,255,0.1);
+  border-radius: 3px; margin-top: 6px; overflow: hidden;
+}
+.mission-progress-fill {
+  height: 100%; background: linear-gradient(90deg, #3498db, #2ecc71);
+  border-radius: 3px;
+}
+.mission-claim-btn {
+  background: linear-gradient(135deg, #f39c12, #e67e22);
+  color: #fff; border: none; padding: 6px 15px; border-radius: 12px;
+  font-size: 12px; font-weight: bold; cursor: pointer;
+  white-space: nowrap;
+}
+.mission-claim-btn:disabled { opacity: 0.4; cursor: not-allowed; background: #666; }
+.mission-claim-btn.claimed { background: #2ecc71; }
+
+/* ===== Game Over ===== */
+#gameOverScreen {
+  background: rgba(0,0,0,0.85);
+  justify-content: center;
+  gap: 20px;
+}
+.gameover-title {
+  color: #e74c3c; font-size: 36px; font-weight: bold;
+  text-shadow: 0 0 20px rgba(231,76,60,0.5);
+}
+.gameover-stats {
+  display: flex; flex-direction: column; gap: 10px; align-items: center;
+}
+.gameover-stat {
+  color: #fff; font-size: 18px; display: flex; align-items: center; gap: 8px;
+}
+.gameover-stat-val { color: #f39c12; font-weight: bold; }
+.gameover-buttons { display: flex; gap: 15px; margin-top: 20px; }
+.gameover-btn {
+  padding: 12px 30px; border: none; border-radius: 25px;
+  font-size: 16px; font-weight: bold; cursor: pointer; color: #fff;
+}
+.btn-restart { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+.btn-home { background: linear-gradient(135deg, #3498db, #2980b9); }
+
+/* ===== Pause Overlay ===== */
+#pauseOverlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  height: 100dvh;
+  background: rgba(0,0,0,0.7); display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 20px; z-index: 30;
+}
+#pauseOverlay.active { display: flex; }
+.pause-title { color: #fff; font-size: 32px; font-weight: bold; }
+.pause-btn {
+  padding: 12px 40px; border: none; border-radius: 25px;
+  font-size: 16px; font-weight: bold; cursor: pointer; color: #fff;
+  min-width: 180px; text-align: center;
+}
+.pause-resume { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+.pause-quit { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+
+/* ===== Toast ===== */
+.toast {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.85); color: #fff; padding: 15px 30px;
+  border-radius: 12px; font-size: 16px; font-weight: bold;
+  z-index: 100; opacity: 0; transition: opacity 0.3s;
+  pointer-events: none; text-align: center;
+}
+.toast.show { opacity: 1; }
+
+/* ===== Settings ===== */
+#settingsScreen {
+  background: linear-gradient(180deg, #2c3e50, #1a252f);
+  padding: 20px;
+}
+.settings-header {
+  width: 100%; display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 20px;
+}
+.settings-title { color: #fff; font-size: 24px; font-weight: bold; }
+.settings-list {
+  width: 100%; display: flex; flex-direction: column; gap: 12px;
+}
+.settings-item {
+  background: rgba(255,255,255,0.08); border-radius: 12px;
+  padding: 15px 20px; display: flex; justify-content: space-between;
+  align-items: center;
+}
+.settings-label { color: #fff; font-size: 15px; }
+.settings-toggle {
+  width: 50px; height: 28px; border-radius: 14px;
+  background: #555; border: none; cursor: pointer;
+  position: relative; transition: background 0.3s;
+}
+.settings-toggle.on { background: #2ecc71; }
+.settings-toggle::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; transition: transform 0.3s;
+}
+.settings-toggle.on::after { transform: translateX(22px); }
+.settings-reset {
+  margin-top: 30px; background: linear-gradient(135deg, #e74c3c, #c0392b);
+  color: #fff; border: none; padding: 12px 30px; border-radius: 25px;
+  font-size: 15px; font-weight: bold; cursor: pointer; align-self: center;
+}
+
+/* ===== Road select ===== */
+#roadScreen {
+  background: linear-gradient(180deg, #1a3a2a, #0d2b1a);
+  padding: 20px;
+}
+.road-header {
+  width: 100%; display: flex; justify-content: space-between;
+  align-items: center; margin-bottom: 15px;
+}
+.road-title { color: #fff; font-size: 24px; font-weight: bold; }
+.road-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+  width: 100%; flex: 1; overflow-y: auto; align-content: start;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.road-item {
+  background: rgba(255,255,255,0.08); border-radius: 15px;
+  padding: 15px; display: flex; flex-direction: column;
+  align-items: center; gap: 8px; cursor: pointer;
+  border: 3px solid transparent;
+}
+.road-item.selected { border-color: #f39c12; }
+.road-preview {
+  width: 80px; height: 100px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; font-size: 40px;
+}
+.road-name { color: #fff; font-size: 14px; font-weight: bold; }
+.road-diff { font-size: 12px; }
+.diff-easy { color: #2ecc71; }
+.diff-medium { color: #f39c12; }
+.diff-hard { color: #e74c3c; }
+.diff-extreme { color: #9b59b6; }
+.road-go-btn {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  color: #fff; border: none; padding: 12px 40px; border-radius: 25px;
+  font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 15px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 2px; }
+
+/* Mobile optimizations */
+@media (max-width: 400px) {
+  .menu-btn { padding: 8px 14px; font-size: 12px; }
+  .btn-start { font-size: 16px; padding: 10px 28px; }
+  .hud-speed { font-size: 18px; padding: 4px 10px; }
+  .powerup-btn { width: 42px; height: 42px; font-size: 20px; }
+  .garage-car-preview { width: 150px; height: 220px; }
+  .reward-grid { grid-template-columns: repeat(3, 1fr); }
+  .shop-grid { grid-template-columns: 1fr; }
+  .bank-display { width: 160px; height: 160px; font-size: 48px; }
+}
+
+@media (max-height: 600px) {
+  .menu-buttons { gap: 5px; }
+  .menu-btn { padding: 6px 12px; font-size: 11px; }
+  .btn-start { font-size: 14px; padding: 8px 22px; }
+  .garage-car-preview { width: 120px; height: 180px; }
+  .garage-display { gap: 10px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Main Menu -->
+<div class="screen active" id="menuScreen">
+  <div class="menu-sky">
+    <div class="menu-road"></div>
+  </div>
+  <div class="menu-title">Come on! Racing</div>
+  <div class="menu-stats">
+    <div class="stat-badge"><span class="icon">🪙</span><span id="menuCoins">0</span></div>
+    <div class="stat-badge"><span class="icon">💎</span><span id="menuGems">0</span></div>
+  </div>
+  <div class="menu-car-display">
+    <canvas id="menuCarCanvas" width="120" height="180"></canvas>
+  </div>
+  <div class="menu-buttons">
+    <button class="menu-btn btn-start" onclick="showScreen('roadScreen')">🏁 开始游戏</button>
+    <button class="menu-btn btn-garage" onclick="showScreen('garageScreen')">🚗 车库</button>
+    <button class="menu-btn btn-shop" onclick="showScreen('shopScreen')">🛒 商店</button>
+    <button class="menu-btn btn-bank" onclick="showScreen('bankScreen')">🎰 银行</button>
+    <button class="menu-btn btn-reward" onclick="showScreen('rewardScreen')">🎁 奖励</button>
+    <button class="menu-btn btn-mission" onclick="showScreen('missionScreen')">📋 任务</button>
+    <button class="menu-btn btn-settings" onclick="showScreen('settingsScreen')">⚙️ 设置</button>
+  </div>
+</div>
+
+<!-- Road Select -->
+<div class="screen" id="roadScreen">
+  <div class="road-header">
+    <button class="back-btn" onclick="showScreen('menuScreen')">← 返回</button>
+    <span class="road-title">选择赛道</span>
+    <div style="width:60px"></div>
+  </div>
+  <div class="road-grid" id="roadGrid"></div>
+  <button class="road-go-btn" onclick="startGame()">🏁 出发！</button>
+</div>
+
+<!-- Game Screen -->
+<div class="screen" id="gameScreen">
+  <canvas id="gameCanvas"></canvas>
+  <div class="game-hud">
+    <div class="hud-top">
+      <div class="hud-left">
+        <div class="hud-speed" id="hudSpeed">0 km/h</div>
+        <div class="hud-item">📏 <span id="hudDist">0</span> m</div>
+      </div>
+      <div class="hud-right">
+        <div class="hud-item">🪙 <span id="hudCoins">0</span></div>
+        <div class="hud-item">⭐ <span id="hudScore">0</span></div>
+      </div>
+    </div>
+    <div class="hud-powerups" id="hudPowerups"></div>
+    <div class="hud-bottom">
+      <button class="hud-pause" onclick="togglePause()">⏸</button>
+      <div class="fuel-bar-container">
+        <div class="fuel-bar" id="fuelBar" style="width:100%"></div>
+        <div class="fuel-label">⛽ 油量</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Pause Overlay -->
+<div id="pauseOverlay">
+  <div class="pause-title">暂停</div>
+  <button class="pause-btn pause-resume" onclick="togglePause()">继续游戏</button>
+  <button class="pause-btn pause-quit" onclick="quitGame()">退出比赛</button>
+</div>
+
+<!-- Game Over -->
+<div class="screen" id="gameOverScreen">
+  <div class="gameover-title">游戏结束</div>
+  <div class="gameover-stats">
+    <div class="gameover-stat">📏 距离: <span class="gameover-stat-val" id="goDistance">0</span> m</div>
+    <div class="gameover-stat">🪙 金币: <span class="gameover-stat-val" id="goCoins">0</span></div>
+    <div class="gameover-stat">⭐ 得分: <span class="gameover-stat-val" id="goScore">0</span></div>
+    <div class="gameover-stat">🏎️ 最高: <span class="gameover-stat-val" id="goBest">0</span> m</div>
+  </div>
+  <div class="gameover-buttons">
+    <button class="gameover-btn btn-restart" onclick="startGame()">🔄 再来一次</button>
+    <button class="gameover-btn btn-home" onclick="quitGame()">🏠 返回</button>
+  </div>
+</div>
+
+<!-- Garage -->
+<div class="screen" id="garageScreen">
+  <div class="garage-header">
+    <button class="back-btn" onclick="showScreen('menuScreen')">← 返回</button>
+    <span class="garage-title">🚗 车库</span>
+    <div class="stat-badge"><span class="icon">🪙</span><span id="garageCoins">0</span></div>
+  </div>
+  <div class="garage-display">
+    <div class="garage-car-preview">
+      <canvas id="garageCarCanvas" width="160" height="240"></canvas>
+    </div>
+    <div class="garage-car-name" id="garageCarName">运动跑车</div>
+    <div class="garage-car-stats" id="garageCarStats"></div>
+    <div class="garage-price" id="garagePrice"></div>
+    <button class="garage-select-btn" id="garageSelectBtn" onclick="garageAction()">选择</button>
+  </div>
+  <div class="garage-nav">
+    <button class="garage-arrow" onclick="garageNav(-1)">‹</button>
+    <div class="garage-dots" id="garageDots"></div>
+    <button class="garage-arrow" onclick="garageNav(1)">›</button>
+  </div>
+</div>
+
+<!-- Shop -->
+<div class="screen" id="shopScreen">
+  <div class="shop-header">
+    <button class="back-btn" onclick="showScreen('menuScreen')">← 返回</button>
+    <span class="shop-title">🛒 商店</span>
+    <div class="shop-coins">🪙 <span id="shopCoins">0</span></div>
+  </div>
+  <div class="shop-grid" id="shopGrid"></div>
+</div>
+
+<!-- Bank -->
+<div class="screen" id="bankScreen">
+  <div class="bank-header">
+    <button class="back-btn" onclick="showScreen('menuScreen')">← 返回</button>
+    <span class="bank-title">🎰 银行</span>
+    <div class="shop-coins">🪙 <span id="bankCoins">0</span></div>
+  </div>
+  <div class="bank-machine">
+    <div class="bank-display" id="bankDisplay">🎰</div>
+    <div class="bank-result" id="bankResult"></div>
+    <div class="bank-buttons">
+      <button class="bank-bet-btn bet-small" onclick="doLottery(68)">🎲 68</button>
+      <button class="bank-bet-btn bet-medium" onclick="doLottery(268)">🎲 268</button>
+      <button class="bank-bet-btn bet-large" onclick="doLottery(580)">🎲 580</button>
+    </div>
+  </div>
+</div>
+
+<!-- Reward -->
+<div class="screen" id="rewardScreen">
+  <div class="reward-header">
+    <button class="back-btn" onclick="showScreen('menuScreen')">← 返回</button>
+    <span class="reward-title">🎁 每日奖励</span>
+    <div style="width:60px"></div>
+  </div>
+  <div class="reward-grid" id="rewardGrid"></div>
+</div>
+
+<!-- Mission -->
+<div class="screen" id="missionScreen">
+  <div class="mission-header">
+    <button class="back-btn" onclick="showScreen('menuScreen')">← 返回</button>
+    <span class="mission-title">📋 任务</span>
+    <div style="width:60px"></div>
+  </div>
+  <div class="mission-list" id="missionList"></div>
+</div>
+
+<!-- Settings -->
+<div class="screen" id="settingsScreen">
+  <div class="settings-header">
+    <button class="back-btn" onclick="showScreen('menuScreen')">← 返回</button>
+    <span class="settings-title">⚙️ 设置</span>
+    <div style="width:60px"></div>
+  </div>
+  <div class="settings-list">
+    <div class="settings-item">
+      <span class="settings-label">🔊 音效</span>
+      <button class="settings-toggle on" id="toggleSound" onclick="toggleSetting('sound')"></button>
+    </div>
+    <div class="settings-item">
+      <span class="settings-label">📳 震动</span>
+      <button class="settings-toggle on" id="toggleVibrate" onclick="toggleSetting('vibrate')"></button>
+    </div>
+    <div class="settings-item">
+      <span class="settings-label">🎵 背景音乐</span>
+      <button class="settings-toggle on" id="toggleMusic" onclick="toggleSetting('music')"></button>
+    </div>
+    <button class="settings-reset" onclick="resetData()">🗑️ 重置所有数据</button>
+  </div>
+</div>
+
+<script>
+// ==================== GAME DATA ====================
+const CARS = [
+  { id: 0, name: '运动跑车', emoji: '🏎️', speed: 5, accel: 5, handling: 5, price: 0, color: '#e74c3c', owned: true },
+  { id: 1, name: '越野吉普', emoji: '🚙', speed: 4, accel: 4, handling: 6, price: 500, color: '#27ae60', owned: false },
+  { id: 2, name: 'F1赛车', emoji: '🏎️', speed: 8, accel: 7, handling: 4, price: 1500, color: '#3498db', owned: false },
+  { id: 3, name: 'Monster Truck', emoji: '🚛', speed: 3, accel: 6, handling: 3, price: 2000, color: '#e67e22', owned: false },
+  { id: 4, name: '警车', emoji: '🚔', speed: 6, accel: 6, handling: 6, price: 3000, color: '#2c3e50', owned: false },
+  { id: 5, name: '出租车', emoji: '🚕', speed: 4, accel: 5, handling: 7, price: 1000, color: '#f1c40f', owned: false },
+  { id: 6, name: '皮卡', emoji: '🛻', speed: 5, accel: 5, handling: 5, price: 1800, color: '#1abc9c', owned: false },
+  { id: 7, name: '装甲车', emoji: '🚐', speed: 3, accel: 3, handling: 4, price: 5000, color: '#7f8c8d', owned: false },
+];
+
+const ROADS = [
+  { id: 0, name: '乡村公路', emoji: '🌾', diff: '简单', diffClass: 'diff-easy', lanes: 3, trafficDensity: 0.6, coinDensity: 1.0 },
+  { id: 1, name: '高速公路', emoji: '🛣️', diff: '中等', diffClass: 'diff-medium', lanes: 4, trafficDensity: 0.8, coinDensity: 1.2 },
+  { id: 2, name: '沙漠公路', emoji: '🏜️', diff: '困难', diffClass: 'diff-hard', lanes: 3, trafficDensity: 1.0, coinDensity: 1.5 },
+  { id: 3, name: '城市街道', emoji: '🏙️', diff: '困难', diffClass: 'diff-hard', lanes: 4, trafficDensity: 1.2, coinDensity: 1.3 },
+  { id: 4, name: '雪山公路', emoji: '🏔️', diff: '极难', diffClass: 'diff-extreme', lanes: 3, trafficDensity: 1.4, coinDensity: 2.0 },
+  { id: 5, name: '海边公路', emoji: '🏖️', diff: '中等', diffClass: 'diff-medium', lanes: 3, trafficDensity: 0.7, coinDensity: 1.1 },
+];
+
+const SHOP_ITEMS = [
+  { id: 'magnet', name: '磁铁', emoji: '🧲', desc: '自动吸附附近金币', price: 100, duration: 15 },
+  { id: 'shield', name: '保护盾', emoji: '🛡️', desc: '抵挡一次碰撞', price: 150, duration: 0 },
+  { id: 'fuel', name: '备用油箱', emoji: '⛽', desc: '补充30%油量', price: 80, duration: 0 },
+  { id: 'thunder', name: '雷霆', emoji: '⚡', desc: '清除屏幕内所有车辆', price: 200, duration: 0 },
+  { id: 'x2coin', name: '双倍金币', emoji: '✖️2', desc: '30秒内金币翻倍', price: 250, duration: 30 },
+  { id: 'slowmo', name: '时间减缓', emoji: '⏳', desc: '减缓周围车辆速度10秒', price: 180, duration: 10 },
+];
+
+const REWARDS = [
+  { day: 1, icon: '🪙', amount: 100 },
+  { day: 2, icon: '🪙', amount: 150 },
+  { day: 3, icon: '🧲', amount: 1, type: 'magnet' },
+  { day: 4, icon: '🪙', amount: 200 },
+  { day: 5, icon: '🛡️', amount: 1, type: 'shield' },
+  { day: 6, icon: '🪙', amount: 300 },
+  { day: 7, icon: '💎', amount: 50 },
+  { day: 8, icon: '🪙', amount: 250 },
+  { day: 9, icon: '⛽', amount: 2, type: 'fuel' },
+  { day: 10, icon: '🪙', amount: 350 },
+  { day: 11, icon: '⚡', amount: 1, type: 'thunder' },
+  { day: 12, icon: '🪙', amount: 400 },
+  { day: 13, icon: '🪙', amount: 500 },
+  { day: 14, icon: '💎', amount: 100 },
+];
+
+const MISSIONS = [
+  { id: 'dist500', name: '初次旅行', desc: '累计行驶500米', icon: '📏', target: 500, reward: 100, rewardIcon: '🪙' },
+  { id: 'dist2000', name: '长途驾驶', desc: '累计行驶2000米', icon: '🛣️', target: 2000, reward: 300, rewardIcon: '🪙' },
+  { id: 'coin500', name: '小富翁', desc: '累计收集500金币', icon: '🪙', target: 500, reward: 200, rewardIcon: '🪙' },
+  { id: 'coin2000', name: '大富翁', desc: '累计收集2000金币', icon: '💰', target: 2000, reward: 500, rewardIcon: '🪙' },
+  { id: 'games10', name: '老司机', desc: '累计进行10场比赛', icon: '🏁', target: 10, reward: 250, rewardIcon: '🪙' },
+  { id: 'dodge50', name: '灵活闪避', desc: '累计闪避50辆车', icon: '🏎️', target: 50, reward: 300, rewardIcon: '🪙' },
+  { id: 'powerup10', name: '道具达人', desc: '累计使用10次道具', icon: '⚡', target: 10, reward: 200, rewardIcon: '🪙' },
+  { id: 'best1000', name: '千米达人', desc: '单局最远1000米', icon: '🏆', target: 1000, reward: 500, rewardIcon: '🪙' },
+];
+
+// ==================== SAVE DATA ====================
+let saveData = {
+  coins: 200,
+  gems: 10,
+  selectedCar: 0,
+  ownedCars: [0],
+  powerups: { magnet: 2, shield: 1, fuel: 2, thunder: 1, x2coin: 0, slowmo: 0 },
+  bestDistance: 0,
+  totalDistance: 0,
+  totalCoins: 0,
+  totalGames: 0,
+  totalDodge: 0,
+  totalPowerupUse: 0,
+  missionProgress: {},
+  missionClaimed: {},
+  rewardDay: 0,
+  lastRewardDate: '',
+  selectedRoad: 0,
+  settings: { sound: true, vibrate: true, music: true },
+};
+
+function loadSave() {
+  try {
+    const s = localStorage.getItem('carRaceSave');
+    if (s) {
+      const parsed = JSON.parse(s);
+      saveData = { ...saveData, ...parsed };
+    }
+  } catch(e) {}
+  // Sync owned cars
+  CARS.forEach(c => {
+    c.owned = saveData.ownedCars.includes(c.id);
+  });
+}
+
+function saveSave() {
+  try {
+    localStorage.setItem('carRaceSave', JSON.stringify(saveData));
+  } catch(e) {}
+}
+
+// ==================== SCREEN MANAGEMENT ====================
+let currentScreen = 'menuScreen';
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  currentScreen = id;
+  updateAllUI();
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1500);
+}
+
+// ==================== UI UPDATES ====================
+function updateAllUI() {
+  // Menu
+  document.getElementById('menuCoins').textContent = saveData.coins;
+  document.getElementById('menuGems').textContent = saveData.gems;
+  drawCarOnCanvas(document.getElementById('menuCarCanvas'), CARS[saveData.selectedCar], 120, 180);
+
+  // Garage
+  document.getElementById('garageCoins').textContent = saveData.coins;
+  updateGarageUI();
+
+  // Shop
+  document.getElementById('shopCoins').textContent = saveData.coins;
+  updateShopUI();
+
+  // Bank
+  document.getElementById('bankCoins').textContent = saveData.coins;
+
+  // Reward
+  updateRewardUI();
+
+  // Mission
+  updateMissionUI();
+
+  // Road
+  updateRoadUI();
+
+  // Settings
+  updateSettingsUI();
+}
+
+// ==================== CAR DRAWING ====================
+function drawCarOnCanvas(canvas, car, w, h) {
+  const ctx = canvas.getContext('2d');
+  canvas.width = w;
+  canvas.height = h;
+  ctx.clearRect(0, 0, w, h);
+
+  const cx = w / 2, cy = h / 2;
+  const carW = w * 0.55, carH = h * 0.7;
+  const x = cx - carW/2, y = cy - carH/2;
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + carH/2 + 5, carW/2 + 5, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Body
+  ctx.fillStyle = car.color;
+  ctx.beginPath();
+  ctx.moveTo(x + 10, y + carH);
+  ctx.lineTo(x, y + carH * 0.7);
+  ctx.lineTo(x + 5, y + carH * 0.3);
+  ctx.quadraticCurveTo(cx, y - 5, x + carW - 5, y + carH * 0.3);
+  ctx.lineTo(x + carW, y + carH * 0.7);
+  ctx.lineTo(x + carW - 10, y + carH);
+  ctx.closePath();
+  ctx.fill();
+
+  // Body highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.beginPath();
+  ctx.moveTo(x + 15, y + carH * 0.7);
+  ctx.lineTo(x + 10, y + carH * 0.35);
+  ctx.quadraticCurveTo(cx - 5, y + 5, cx, y + carH * 0.3);
+  ctx.lineTo(cx, y + carH * 0.7);
+  ctx.closePath();
+  ctx.fill();
+
+  // Windshield
+  ctx.fillStyle = '#87CEEB';
+  ctx.beginPath();
+  ctx.moveTo(x + 12, y + carH * 0.35);
+  ctx.lineTo(x + 15, y + carH * 0.2);
+  ctx.quadraticCurveTo(cx, y + carH * 0.12, x + carW - 15, y + carH * 0.2);
+  ctx.lineTo(x + carW - 12, y + carH * 0.35);
+  ctx.closePath();
+  ctx.fill();
+
+  // Rear window
+  ctx.fillStyle = '#5DADE2';
+  ctx.beginPath();
+  ctx.moveTo(x + 14, y + carH * 0.55);
+  ctx.lineTo(x + 12, y + carH * 0.65);
+  ctx.lineTo(x + carW - 12, y + carH * 0.65);
+  ctx.lineTo(x + carW - 14, y + carH * 0.55);
+  ctx.closePath();
+  ctx.fill();
+
+  // Wheels
+  ctx.fillStyle = '#2c3e50';
+  const wheelW = 10, wheelH = 22;
+  // Front wheels
+  ctx.fillRect(x - 3, y + carH * 0.2, wheelW, wheelH);
+  ctx.fillRect(x + carW - wheelW + 3, y + carH * 0.2, wheelW, wheelH);
+  // Rear wheels
+  ctx.fillRect(x - 3, y + carH * 0.7, wheelW, wheelH);
+  ctx.fillRect(x + carW - wheelW + 3, y + carH * 0.7, wheelW, wheelH);
+
+  // Wheel rims
+  ctx.fillStyle = '#95a5a6';
+  ctx.fillRect(x, y + carH * 0.2 + 4, wheelW - 5, wheelH - 8);
+  ctx.fillRect(x + carW - wheelW + 6, y + carH * 0.2 + 4, wheelW - 5, wheelH - 8);
+  ctx.fillRect(x, y + carH * 0.7 + 4, wheelW - 5, wheelH - 8);
+  ctx.fillRect(x + carW - wheelW + 6, y + carH * 0.7 + 4, wheelW - 5, wheelH - 8);
+
+  // Headlights
+  ctx.fillStyle = '#f9e79f';
+  ctx.beginPath();
+  ctx.ellipse(x + 18, y + carH * 0.15, 5, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(x + carW - 18, y + carH * 0.15, 5, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Taillights
+  ctx.fillStyle = '#e74c3c';
+  ctx.fillRect(x + 12, y + carH - 8, 12, 5);
+  ctx.fillRect(x + carW - 24, y + carH - 8, 12, 5);
+}
+
+function drawCarInGame(ctx, car, x, y, w, h, angle) {
+  ctx.save();
+  ctx.translate(x + w/2, y + h/2);
+  if (angle) ctx.rotate(angle);
+  ctx.translate(-w/2, -h/2);
+
+  // Body
+  ctx.fillStyle = car.color;
+  ctx.beginPath();
+  ctx.moveTo(8, h);
+  ctx.lineTo(0, h * 0.7);
+  ctx.lineTo(4, h * 0.3);
+  ctx.quadraticCurveTo(w/2, -3, w - 4, h * 0.3);
+  ctx.lineTo(w, h * 0.7);
+  ctx.lineTo(w - 8, h);
+  ctx.closePath();
+  ctx.fill();
+
+  // Windshield
+  ctx.fillStyle = '#87CEEB';
+  ctx.beginPath();
+  ctx.moveTo(10, h * 0.32);
+  ctx.lineTo(12, h * 0.18);
+  ctx.quadraticCurveTo(w/2, h * 0.1, w - 12, h * 0.18);
+  ctx.lineTo(w - 10, h * 0.32);
+  ctx.closePath();
+  ctx.fill();
+
+  // Wheels
+  ctx.fillStyle = '#2c3e50';
+  ctx.fillRect(-2, h * 0.18, 7, 16);
+  ctx.fillRect(w - 5, h * 0.18, 7, 16);
+  ctx.fillRect(-2, h * 0.68, 7, 16);
+  ctx.fillRect(w - 5, h * 0.68, 7, 16);
+
+  // Headlights
+  ctx.fillStyle = '#f9e79f';
+  ctx.beginPath();
+  ctx.ellipse(14, h * 0.12, 4, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(w - 14, h * 0.12, 4, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// ==================== GARAGE ====================
+let garageIdx = 0;
+
+function updateGarageUI() {
+  garageIdx = saveData.selectedCar;
+  renderGarage();
+}
+
+function renderGarage() {
+  const car = CARS[garageIdx];
+  drawCarOnCanvas(document.getElementById('garageCarCanvas'), car, 160, 240);
+  document.getElementById('garageCarName').textContent = car.name;
+
+  const stats = document.getElementById('garageCarStats');
+  stats.innerHTML = `
+    <div class="garage-stat">速度<br><span class="garage-stat-val">${car.speed}/10</span></div>
+    <div class="garage-stat">加速<br><span class="garage-stat-val">${car.accel}/10</span></div>
+    <div class="garage-stat">操控<br><span class="garage-stat-val">${car.handling}/10</span></div>
+  `;
+
+  const btn = document.getElementById('garageSelectBtn');
+  const priceEl = document.getElementById('garagePrice');
+
+  if (car.owned) {
+    if (saveData.selectedCar === car.id) {
+      btn.textContent = '✓ 已选择';
+      btn.className = 'garage-select-btn owned';
+    } else {
+      btn.textContent = '选择';
+      btn.className = 'garage-select-btn';
+    }
+    priceEl.textContent = '';
+  } else {
+    btn.textContent = `购买 🪙${car.price}`;
+    btn.className = 'garage-select-btn';
+    priceEl.textContent = `价格: 🪙 ${car.price}`;
+  }
+
+  // Dots
+  const dots = document.getElementById('garageDots');
+  dots.innerHTML = CARS.map((c, i) =>
+    `<div class="garage-dot ${i === garageIdx ? 'active' : ''}" onclick="garageIdx=${i};renderGarage()"></div>`
+  ).join('');
+}
+
+function garageNav(dir) {
+  garageIdx = (garageIdx + dir + CARS.length) % CARS.length;
+  renderGarage();
+}
+
+function garageAction() {
+  const car = CARS[garageIdx];
+  if (car.owned) {
+    saveData.selectedCar = car.id;
+    saveSave();
+    showToast(`已选择 ${car.name}`);
+    renderGarage();
+  } else {
+    if (saveData.coins >= car.price) {
+      saveData.coins -= car.price;
+      car.owned = true;
+      saveData.ownedCars.push(car.id);
+      saveData.selectedCar = car.id;
+      saveSave();
+      showToast(`购买成功！${car.name}`);
+      renderGarage();
+      updateAllUI();
+    } else {
+      showToast('金币不足！');
+    }
+  }
+}
+
+// ==================== SHOP ====================
+function updateShopUI() {
+  const grid = document.getElementById('shopGrid');
+  grid.innerHTML = SHOP_ITEMS.map(item => `
+    <div class="shop-item">
+      <div class="shop-item-icon">${item.emoji}</div>
+      <div class="shop-item-name">${item.name}</div>
+      <div class="shop-item-desc">${item.desc}</div>
+      <div style="color:rgba(255,255,255,0.5);font-size:11px">库存: ${saveData.powerups[item.id] || 0}</div>
+      <button class="shop-buy-btn" onclick="buyItem('${item.id}', ${item.price})"
+        ${saveData.coins < item.price ? 'disabled' : ''}>
+        🪙 ${item.price}
+      </button>
+    </div>
+  `).join('');
+}
+
+function buyItem(id, price) {
+  if (saveData.coins >= price) {
+    saveData.coins -= price;
+    saveData.powerups[id] = (saveData.powerups[id] || 0) + 1;
+    saveSave();
+    showToast('购买成功！');
+    updateAllUI();
+  } else {
+    showToast('金币不足！');
+  }
+}
+
+// ==================== BANK / LOTTERY ====================
+let lotterySpinning = false;
+
+function doLottery(bet) {
+  if (lotterySpinning) return;
+  if (saveData.coins < bet) {
+    showToast('金币不足！');
+    return;
+  }
+  saveData.coins -= bet;
+  lotterySpinning = true;
+
+  const display = document.getElementById('bankDisplay');
+  const result = document.getElementById('bankResult');
+  result.textContent = '';
+  display.classList.add('spinning');
+
+  const emojis = ['🪙', '💎', '🧲', '🛡️', '⛽', '⚡', '💰', '🏆', '🎁', '✖️2', '🏎️', '🎉'];
+  let spinCount = 0;
+  const spinInterval = setInterval(() => {
+    display.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    spinCount++;
+    if (spinCount > 20) {
+      clearInterval(spinInterval);
+      display.classList.remove('spinning');
+      // Determine reward
+      const rand = Math.random();
+      let reward, rewardText;
+      if (rand < 0.02) {
+        // Jackpot - 5x
+        reward = bet * 5;
+        rewardText = `🎉 大奖！获得 🪙${reward}！`;
+        saveData.coins += reward;
+      } else if (rand < 0.15) {
+        // Big win - 2x
+        reward = bet * 2;
+        rewardText = `🎊 大赢！获得 🪙${reward}！`;
+        saveData.coins += reward;
+      } else if (rand < 0.40) {
+        // Win - 1.2x
+        reward = Math.floor(bet * 1.2);
+        rewardText = `✨ 赢了！获得 🪙${reward}！`;
+        saveData.coins += reward;
+      } else if (rand < 0.55) {
+        // Break even
+        reward = bet;
+        rewardText = `😐 保本，返还 🪙${reward}`;
+        saveData.coins += reward;
+      } else if (rand < 0.70) {
+        // Small item reward
+        const items = ['magnet', 'shield', 'fuel', 'thunder'];
+        const item = items[Math.floor(Math.random() * items.length)];
+        saveData.powerups[item] = (saveData.powerups[item] || 0) + 1;
+        rewardText = `🎁 获得道具！`;
+      } else {
+        // Lose
+        rewardText = `😢 谢谢参与`;
+      }
+      const winEmoji = reward > 0 ? '💰' : (saveData.powerups && rewardText.includes('道具') ? '🎁' : '😢');
+      display.textContent = winEmoji;
+      result.textContent = rewardText;
+      lotterySpinning = false;
+      saveSave();
+      updateAllUI();
+    }
+  }, 80);
+}
+
+// ==================== REWARDS ====================
+function updateRewardUI() {
+  const grid = document.getElementById('rewardGrid');
+  const today = new Date().toDateString();
+
+  grid.innerHTML = REWARDS.map(r => {
+    const isClaimed = r.day <= saveData.rewardDay;
+    const isAvailable = r.day === saveData.rewardDay + 1 && saveData.lastRewardDate !== today;
+    return `
+      <div class="reward-day ${isClaimed ? 'claimed' : ''} ${isAvailable ? 'available' : ''}"
+        onclick="${isAvailable ? `claimReward(${r.day})` : ''}">
+        <div class="reward-day-num">第${r.day}天</div>
+        <div class="reward-icon">${r.icon}</div>
+        <div class="reward-amount">${isClaimed ? '✓' : (r.type ? `x${r.amount}` : r.amount)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function claimReward(day) {
+  const reward = REWARDS.find(r => r.day === day);
+  if (!reward) return;
+
+  if (reward.type) {
+    saveData.powerups[reward.type] = (saveData.powerups[reward.type] || 0) + reward.amount;
+  } else {
+    saveData.coins += reward.amount;
+  }
+  saveData.rewardDay = day;
+  saveData.lastRewardDate = new Date().toDateString();
+  saveSave();
+  showToast(`领取成功！获得 ${reward.icon} x${reward.amount}`);
+  updateAllUI();
+}
+
+// ==================== MISSIONS ====================
+function updateMissionUI() {
+  const list = document.getElementById('missionList');
+  list.innerHTML = MISSIONS.map(m => {
+    const progress = getMissionProgress(m);
+    const pct = Math.min(100, (progress / m.target) * 100);
+    const done = progress >= m.target;
+    const claimed = saveData.missionClaimed[m.id];
+    return `
+      <div class="mission-item">
+        <div class="mission-icon">${m.icon}</div>
+        <div class="mission-info">
+          <div class="mission-name">${m.name}</div>
+          <div class="mission-desc">${m.desc} (${Math.min(progress, m.target)}/${m.target})</div>
+          <div class="mission-progress-bar">
+            <div class="mission-progress-fill" style="width:${pct}%"></div>
+          </div>
+        </div>
+        <button class="mission-claim-btn ${claimed ? 'claimed' : ''}"
+          ${!done || claimed ? 'disabled' : ''} onclick="claimMission('${m.id}')">
+          ${claimed ? '✓ 已领' : (done ? `领 ${m.rewardIcon}${m.reward}` : `${m.rewardIcon}${m.reward}`)}
+        </button>
+      </div>
+    `;
+  }).join('');
+}
+
+function getMissionProgress(m) {
+  switch(m.id) {
+    case 'dist500': case 'dist2000': return saveData.totalDistance;
+    case 'coin500': case 'coin2000': return saveData.totalCoins;
+    case 'games10': return saveData.totalGames;
+    case 'dodge50': return saveData.totalDodge;
+    case 'powerup10': return saveData.totalPowerupUse;
+    case 'best1000': return saveData.bestDistance;
+    default: return 0;
+  }
+}
+
+function claimMission(id) {
+  const m = MISSIONS.find(x => x.id === id);
+  if (!m || saveData.missionClaimed[id]) return;
+  saveData.coins += m.reward;
+  saveData.missionClaimed[id] = true;
+  saveSave();
+  showToast(`领取成功！获得 🪙${m.reward}`);
+  updateAllUI();
+}
+
+// ==================== ROAD SELECT ====================
+function updateRoadUI() {
+  const grid = document.getElementById('roadGrid');
+  grid.innerHTML = ROADS.map(r => `
+    <div class="road-item ${saveData.selectedRoad === r.id ? 'selected' : ''}"
+      onclick="saveData.selectedRoad=${r.id};updateRoadUI();saveSave()">
+      <div class="road-preview">${r.emoji}</div>
+      <div class="road-name">${r.name}</div>
+      <div class="road-diff ${r.diffClass}">${r.diff}</div>
+    </div>
+  `).join('');
+}
+
+// ==================== SETTINGS ====================
+function updateSettingsUI() {
+  ['sound', 'vibrate', 'music'].forEach(key => {
+    const btn = document.getElementById('toggle' + key.charAt(0).toUpperCase() + key.slice(1));
+    if (saveData.settings[key]) {
+      btn.classList.add('on');
+    } else {
+      btn.classList.remove('on');
+    }
+  });
+}
+
+function toggleSetting(key) {
+  saveData.settings[key] = !saveData.settings[key];
+  saveSave();
+  updateSettingsUI();
+}
+
+function resetData() {
+  if (confirm('确定要重置所有数据吗？此操作不可撤销！')) {
+    localStorage.removeItem('carRaceSave');
+    location.reload();
+  }
+}
+
+// ==================== GAME ENGINE ====================
+let game = null;
+let gameLoop = null;
+let paused = false;
+
+const ENEMY_COLORS = ['#3498db', '#e67e22', '#2ecc71', '#9b59b6', '#1abc9c', '#e74c3c', '#f39c12', '#34495e'];
+const ENEMY_TYPES = [
+  { w: 36, h: 60, name: 'sedan' },
+  { w: 40, h: 70, name: 'suv' },
+  { w: 44, h: 80, name: 'truck' },
+  { w: 34, h: 55, name: 'compact' },
+];
+
+function startGame() {
+  showScreen('gameScreen');
+  paused = false;
+  document.getElementById('pauseOverlay').classList.remove('active');
+
+  const canvas = document.getElementById('gameCanvas');
+  const W = window.innerWidth;
+  const H = window.innerHeight;
+  canvas.width = W;
+  canvas.height = H;
+
+  const road = ROADS[saveData.selectedRoad];
+  const car = CARS[saveData.selectedCar];
+  const laneCount = road.lanes;
+  const laneW = Math.min(80, (W - 40) / laneCount);
+  const roadW = laneW * laneCount;
+  const roadX = (W - roadW) / 2;
+
+  game = {
+    canvas, ctx: canvas.getContext('2d'),
+    W, H,
+    road, car, laneCount, laneW, roadW, roadX,
+    // Player
+    px: roadX + roadW / 2 - 20,
+    py: H - 140,
+    pw: 40, ph: 68,
+    pSpeed: 0,
+    maxSpeed: 3 + car.speed * 0.8,
+    accelRate: 0.02 + car.accel * 0.005,
+    handling: 2 + car.handling * 0.5,
+    // State
+    fuel: 100,
+    fuelDrain: 0.015 + road.trafficDensity * 0.005,
+    distance: 0,
+    coins: 0,
+    score: 0,
+    speed: 0,
+    // Objects
+    enemies: [],
+    coinItems: [],
+    powerupItems: [],
+    particles: [],
+    roadLines: [],
+    trees: [],
+    // Timing
+    enemyTimer: 0,
+    enemyInterval: Math.max(30, 80 - road.trafficDensity * 25),
+    coinTimer: 0,
+    powerupTimer: 0,
+    treeTimer: 0,
+    // Powerup states
+    magnetActive: false,
+    magnetTimer: 0,
+    shieldActive: false,
+    x2coinActive: false,
+    x2coinTimer: 0,
+    slowmoActive: false,
+    slowmoTimer: 0,
+    // Invincibility after hit
+    invincible: false,
+    invincibleTimer: 0,
+    // Controls
+    moveLeft: false,
+    moveRight: false,
+    touchStartX: 0,
+    touchCurrentX: 0,
+    touching: false,
+    // Stats
+    dodged: 0,
+    alive: true,
+    frameCount: 0,
+    difficulty: 1,
+  };
+
+  // Init road lines
+  for (let y = -50; y < H + 50; y += 60) {
+    game.roadLines.push({ y });
+  }
+
+  // Init trees
+  for (let y = -100; y < H + 100; y += 80 + Math.random() * 60) {
+    game.trees.push({ y, side: Math.random() < 0.5 ? 'left' : 'right', type: Math.floor(Math.random() * 3) });
+  }
+
+  // Update HUD powerups
+  updateHudPowerups();
+
+  // Save game count
+  saveData.totalGames++;
+  saveSave();
+
+  if (gameLoop) cancelAnimationFrame(gameLoop);
+  gameLoop = requestAnimationFrame(gameUpdate);
+}
+
+function updateHudPowerups() {
+  const hud = document.getElementById('hudPowerups');
+  const items = [
+    { id: 'magnet', emoji: '🧲', cls: 'pu-magnet' },
+    { id: 'shield', emoji: '🛡️', cls: 'pu-shield' },
+    { id: 'fuel', emoji: '⛽', cls: 'pu-fuel' },
+    { id: 'thunder', emoji: '⚡', cls: 'pu-thunder' },
+  ];
+  hud.innerHTML = items.map(it => {
+    const count = saveData.powerups[it.id] || 0;
+    const isActive = (it.id === 'magnet' && game && game.magnetActive);
+    return `
+      <div class="powerup-btn ${it.cls} ${isActive ? 'active' : ''}" onclick="usePowerup('${it.id}')">
+        ${it.emoji}
+        <span class="count">${count}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function usePowerup(id) {
+  if (!game || !game.alive || paused) return;
+  const count = saveData.powerups[id] || 0;
+  if (count <= 0) {
+    showToast('道具不足！');
+    return;
+  }
+
+  saveData.powerups[id]--;
+  saveData.totalPowerupUse++;
+
+  switch(id) {
+    case 'magnet':
+      game.magnetActive = true;
+      game.magnetTimer = 15 * 60; // 15 seconds
+      showToast('🧲 磁铁激活！');
+      break;
+    case 'shield':
+      game.shieldActive = true;
+      showToast('🛡️ 保护盾激活！');
+      break;
+    case 'fuel':
+      game.fuel = Math.min(100, game.fuel + 30);
+      showToast('⛽ 油量补充！');
+      break;
+    case 'thunder':
+      // Clear all enemies
+      game.enemies.forEach(e => {
+        addExplosion(e.x + e.w/2, e.y + e.h/2);
+        game.coins += 2;
+        game.score += 10;
+      });
+      game.enemies = [];
+      showToast('⚡ 雷霆清除！');
+      break;
+  }
+  saveSave();
+  updateHudPowerups();
+}
+
+function addExplosion(x, y) {
+  for (let i = 0; i < 12; i++) {
+    game.particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 8,
+      vy: (Math.random() - 0.5) * 8,
+      life: 30 + Math.random() * 20,
+      color: ['#e74c3c', '#f39c12', '#f1c40f', '#e67e22'][Math.floor(Math.random() * 4)],
+      size: 3 + Math.random() * 4,
+    });
+  }
+}
+
+function addCoinEffect(x, y) {
+  for (let i = 0; i < 5; i++) {
+    game.particles.push({
+      x, y,
+      vx: (Math.random() - 0.5) * 3,
+      vy: -2 - Math.random() * 3,
+      life: 20 + Math.random() * 10,
+      color: '#f1c40f',
+      size: 2 + Math.random() * 3,
+    });
+  }
+}
+
+// ==================== GAME UPDATE ====================
+function gameUpdate() {
+  if (!game || !game.alive) return;
+  if (paused) {
+    gameLoop = requestAnimationFrame(gameUpdate);
+    return;
+  }
+
+  game.frameCount++;
+  const g = game;
+  const ctx = g.ctx;
+
+  // Increase difficulty over time
+  g.difficulty = 1 + g.distance / 3000;
+
+  // Speed
+  if (g.pSpeed < g.maxSpeed * g.difficulty) {
+    g.pSpeed += g.accelRate;
+  }
+  g.speed = Math.floor(g.pSpeed * 40);
+
+  // Fuel drain
+  g.fuel -= g.fuelDrain * (g.pSpeed / g.maxSpeed);
+  if (g.fuel <= 0) {
+    g.fuel = 0;
+    gameOver();
+    return;
+  }
+
+  // Player movement
+  let moveDir = 0;
+  if (g.moveLeft) moveDir -= 1;
+  if (g.moveRight) moveDir += 1;
+  if (g.touching) {
+    const dx = g.touchCurrentX - g.touchStartX;
+    if (Math.abs(dx) > 10) {
+      moveDir = dx > 0 ? 1 : -1;
+      // Proportional control
+      const ratio = Math.min(1, Math.abs(dx) / 80);
+      moveDir *= ratio;
+    }
+  }
+  g.px += moveDir * g.handling;
+  // Clamp to road
+  g.px = Math.max(g.roadX + 5, Math.min(g.roadX + g.roadW - g.pw - 5, g.px));
+
+  // Distance & score
+  g.distance += g.pSpeed * 0.5;
+  g.score = Math.floor(g.distance * 0.1);
+
+  // Road lines
+  g.roadLines.forEach(l => {
+    l.y += g.pSpeed;
+    if (l.y > g.H + 50) l.y -= g.H + 100;
+  });
+
+  // Trees
+  g.trees.forEach(t => {
+    t.y += g.pSpeed * 0.6;
+    if (t.y > g.H + 100) {
+      t.y -= g.H + 200;
+      t.side = Math.random() < 0.5 ? 'left' : 'right';
+      t.type = Math.floor(Math.random() * 3);
+    }
+  });
+
+  // Spawn enemies
+  g.enemyTimer++;
+  const spawnRate = Math.max(15, g.enemyInterval - g.difficulty * 8);
+  if (g.enemyTimer >= spawnRate) {
+    g.enemyTimer = 0;
+    const lane = Math.floor(Math.random() * g.laneCount);
+    const type = ENEMY_TYPES[Math.floor(Math.random() * ENEMY_TYPES.length)];
+    const ex = g.roadX + lane * g.laneW + (g.laneW - type.w) / 2;
+    // Check no overlap with existing enemies
+    const tooClose = g.enemies.some(e => Math.abs(e.x - ex) < type.w && Math.abs(e.y) < type.h + 40);
+    if (!tooClose) {
+      const speedMult = g.slowmoActive ? 0.3 : 1;
+      g.enemies.push({
+        x: ex, y: -type.h - 20,
+        w: type.w, h: type.h,
+        speed: (1 + Math.random() * 1.5) * speedMult,
+        color: ENEMY_COLORS[Math.floor(Math.random() * ENEMY_COLORS.length)],
+        type: type.name,
+        passed: false,
+      });
+    }
+  }
+
+  // Spawn coins
+  g.coinTimer++;
+  if (g.coinTimer >= Math.max(20, 50 - g.road.coinDensity * 15)) {
+    g.coinTimer = 0;
+    const cx = g.roadX + 15 + Math.random() * (g.roadW - 30);
+    g.coinItems.push({ x: cx, y: -20, size: 14, collected: false, angle: 0 });
+  }
+
+  // Spawn powerup items (rare)
+  g.powerupTimer++;
+  if (g.powerupTimer >= 600 + Math.random() * 300) {
+    g.powerupTimer = 0;
+    const types = ['fuel', 'magnet', 'shield'];
+    const ptype = types[Math.floor(Math.random() * types.length)];
+    const px = g.roadX + 20 + Math.random() * (g.roadW - 40);
+    g.powerupItems.push({ x: px, y: -30, type: ptype, size: 20 });
+  }
+
+  // Update enemies
+  const speedMult = g.slowmoActive ? 0.3 : 1;
+  g.enemies.forEach(e => {
+    e.y += (g.pSpeed - e.speed) * speedMult;
+  });
+
+  // Check dodge
+  g.enemies = g.enemies.filter(e => {
+    if (e.y > g.H + 50) {
+      if (!e.passed) {
+        e.passed = true;
+        g.dodged++;
+        g.score += 5;
+      }
+      return false;
+    }
+    return true;
+  });
+
+  // Update coins
+  g.coinItems.forEach(c => {
+    c.y += g.pSpeed;
+    c.angle += 0.05;
+    // Magnet attraction
+    if (g.magnetActive && !c.collected) {
+      const dx = (g.px + g.pw/2) - c.x;
+      const dy = (g.py + g.ph/2) - c.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if (dist < 150) {
+        c.x += dx * 0.08;
+        c.y += dy * 0.08;
+      }
+    }
+  });
+  g.coinItems = g.coinItems.filter(c => c.y < g.H + 50 && !c.collected);
+
+  // Update powerup items
+  g.powerupItems.forEach(p => { p.y += g.pSpeed; });
+  g.powerupItems = g.powerupItems.filter(p => p.y < g.H + 50);
+
+  // Powerup timers
+  if (g.magnetActive) {
+    g.magnetTimer--;
+    if (g.magnetTimer <= 0) { g.magnetActive = false; updateHudPowerups(); }
+  }
+  if (g.x2coinActive) {
+    g.x2coinTimer--;
+    if (g.x2coinTimer <= 0) g.x2coinActive = false;
+  }
+  if (g.slowmoActive) {
+    g.slowmoTimer--;
+    if (g.slowmoTimer <= 0) g.slowmoActive = false;
+  }
+  if (g.invincible) {
+    g.invincibleTimer--;
+    if (g.invincibleTimer <= 0) g.invincible = false;
+  }
+
+  // Collision: coins
+  g.coinItems.forEach(c => {
+    if (!c.collected && rectOverlap(g.px, g.py, g.pw, g.ph, c.x - c.size/2, c.y - c.size/2, c.size, c.size)) {
+      c.collected = true;
+      const amount = g.x2coinActive ? 2 : 1;
+      g.coins += amount;
+      g.score += 3;
+      addCoinEffect(c.x, c.y);
+    }
+  });
+
+  // Collision: powerup items
+  g.powerupItems.forEach((p, i) => {
+    if (rectOverlap(g.px, g.py, g.pw, g.ph, p.x - p.size/2, p.y - p.size/2, p.size, p.size)) {
+      saveData.powerups[p.type] = (saveData.powerups[p.type] || 0) + 1;
+      g.powerupItems.splice(i, 1);
+      showToast(`获得 ${p.type === 'fuel' ? '⛽' : p.type === 'magnet' ? '🧲' : '🛡️'}！`);
+      saveSave();
+      updateHudPowerups();
+    }
+  });
+
+  // Collision: enemies
+  if (!g.invincible) {
+    for (const e of g.enemies) {
+      if (rectOverlap(g.px + 4, g.py + 4, g.pw - 8, g.ph - 8, e.x + 3, e.y + 3, e.w - 6, e.h - 6)) {
+        if (g.shieldActive) {
+          g.shieldActive = false;
+          g.invincible = true;
+          g.invincibleTimer = 60;
+          addExplosion(e.x + e.w/2, e.y + e.h/2);
+          g.enemies = g.enemies.filter(en => en !== e);
+          showToast('🛡️ 保护盾抵挡了碰撞！');
+          break;
+        } else {
+          addExplosion(g.px + g.pw/2, g.py + g.ph/2);
+          gameOver();
+          return;
+        }
+      }
+    }
+  }
+
+  // Update particles
+  g.particles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life--;
+    p.size *= 0.96;
+  });
+  g.particles = g.particles.filter(p => p.life > 0);
+
+  // ====== RENDER ======
+  render();
+
+  // Update HUD
+  document.getElementById('hudSpeed').textContent = g.speed + ' km/h';
+  document.getElementById('hudDist').textContent = Math.floor(g.distance);
+  document.getElementById('hudCoins').textContent = g.coins;
+  document.getElementById('hudScore').textContent = g.score;
+  document.getElementById('fuelBar').style.width = g.fuel + '%';
+
+  gameLoop = requestAnimationFrame(gameUpdate);
+}
+
+function rectOverlap(x1, y1, w1, h1, x2, y2, w2, h2) {
+  return x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2;
+}
+
+// ==================== RENDER ====================
+function render() {
+  const g = game;
+  const ctx = g.ctx;
+  const W = g.W, H = g.H;
+
+  // Sky / grass
+  ctx.fillStyle = '#4a7c59';
+  ctx.fillRect(0, 0, W, H);
+
+  // Road shoulder
+  ctx.fillStyle = '#8B7355';
+  ctx.fillRect(g.roadX - 15, 0, g.roadW + 30, H);
+
+  // Road
+  ctx.fillStyle = '#555';
+  ctx.fillRect(g.roadX, 0, g.roadW, H);
+
+  // Road edge lines
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(g.roadX, 0, 3, H);
+  ctx.fillRect(g.roadX + g.roadW - 3, 0, 3, H);
+
+  // Lane markings
+  for (let i = 1; i < g.laneCount; i++) {
+    const lx = g.roadX + i * g.laneW;
+    g.roadLines.forEach(l => {
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillRect(lx - 1.5, l.y, 3, 30);
+    });
+  }
+
+  // Trees
+  g.trees.forEach(t => {
+    const tx = t.side === 'left' ? g.roadX - 40 - Math.random() * 20 : g.roadX + g.roadW + 20 + Math.random() * 20;
+    drawTree(ctx, tx, t.y, t.type);
+  });
+
+  // Coins
+  g.coinItems.forEach(c => {
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.rotate(c.angle);
+    ctx.fillStyle = '#f1c40f';
+    ctx.beginPath();
+    ctx.arc(0, 0, c.size/2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f39c12';
+    ctx.beginPath();
+    ctx.arc(0, 0, c.size/2 - 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f1c40f';
+    ctx.font = `bold ${c.size - 4}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('$', 0, 0);
+    ctx.restore();
+  });
+
+  // Powerup items
+  g.powerupItems.forEach(p => {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    // Glow
+    ctx.shadowColor = p.type === 'fuel' ? '#f1c40f' : p.type === 'magnet' ? '#e74c3c' : '#3498db';
+    ctx.shadowBlur = 15;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath();
+    ctx.arc(0, 0, p.size/2 + 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.font = `${p.size}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(p.type === 'fuel' ? '⛽' : p.type === 'magnet' ? '🧲' : '🛡️', 0, 0);
+    ctx.restore();
+  });
+
+  // Enemies
+  g.enemies.forEach(e => {
+    drawEnemyCar(ctx, e);
+  });
+
+  // Player car
+  if (!g.invincible || Math.floor(g.frameCount / 4) % 2 === 0) {
+    drawCarInGame(ctx, g.car, g.px, g.py, g.pw, g.ph, 0);
+  }
+
+  // Shield visual
+  if (g.shieldActive) {
+    ctx.strokeStyle = 'rgba(52, 152, 219, 0.6)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.ellipse(g.px + g.pw/2, g.py + g.ph/2, g.pw/2 + 8, g.ph/2 + 8, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(52, 152, 219, 0.3)';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.ellipse(g.px + g.pw/2, g.py + g.ph/2, g.pw/2 + 12, g.ph/2 + 12, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Magnet visual
+  if (g.magnetActive) {
+    ctx.strokeStyle = 'rgba(231, 76, 60, 0.2)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.arc(g.px + g.pw/2, g.py + g.ph/2, 150, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Particles
+  g.particles.forEach(p => {
+    ctx.globalAlpha = p.life / 50;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+}
+
+function drawTree(ctx, x, y, type) {
+  ctx.save();
+  ctx.translate(x, y);
+  // Trunk
+  ctx.fillStyle = '#6B4226';
+  ctx.fillRect(-3, 0, 6, 15);
+  // Canopy
+  if (type === 0) {
+    ctx.fillStyle = '#2d5a1e';
+    ctx.beginPath();
+    ctx.arc(0, -5, 14, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (type === 1) {
+    ctx.fillStyle = '#1e6b2e';
+    ctx.beginPath();
+    ctx.moveTo(0, -22);
+    ctx.lineTo(-12, 5);
+    ctx.lineTo(12, 5);
+    ctx.closePath();
+    ctx.fill();
+  } else {
+    ctx.fillStyle = '#3d8b37';
+    ctx.beginPath();
+    ctx.arc(0, -3, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(-6, -8, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(6, -8, 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawEnemyCar(ctx, e) {
+  ctx.save();
+  ctx.translate(e.x + e.w/2, e.y + e.h/2);
+  ctx.rotate(Math.PI); // Facing downward (towards player)
+  ctx.translate(-e.w/2, -e.h/2);
+
+  // Body
+  ctx.fillStyle = e.color;
+  ctx.beginPath();
+  ctx.moveTo(6, e.h);
+  ctx.lineTo(0, e.h * 0.7);
+  ctx.lineTo(3, e.h * 0.3);
+  ctx.quadraticCurveTo(e.w/2, -2, e.w - 3, e.h * 0.3);
+  ctx.lineTo(e.w, e.h * 0.7);
+  ctx.lineTo(e.w - 6, e.h);
+  ctx.closePath();
+  ctx.fill();
+
+  // Windshield
+  ctx.fillStyle = '#87CEEB';
+  ctx.beginPath();
+  ctx.moveTo(8, e.h * 0.3);
+  ctx.lineTo(10, e.h * 0.17);
+  ctx.quadraticCurveTo(e.w/2, e.h * 0.1, e.w - 10, e.h * 0.17);
+  ctx.lineTo(e.w - 8, e.h * 0.3);
+  ctx.closePath();
+  ctx.fill();
+
+  // Wheels
+  ctx.fillStyle = '#2c3e50';
+  ctx.fillRect(-2, e.h * 0.18, 6, 14);
+  ctx.fillRect(e.w - 4, e.h * 0.18, 6, 14);
+  ctx.fillRect(-2, e.h * 0.68, 6, 14);
+  ctx.fillRect(e.w - 4, e.h * 0.68, 6, 14);
+
+  // Headlights (at bottom since rotated)
+  ctx.fillStyle = '#f9e79f';
+  ctx.beginPath();
+  ctx.arc(12, e.h * 0.1, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(e.w - 12, e.h * 0.1, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// ==================== GAME OVER ====================
+function gameOver() {
+  game.alive = false;
+
+  // Save stats
+  const dist = Math.floor(game.distance);
+  saveData.totalDistance += dist;
+  saveData.totalCoins += game.coins;
+  saveData.totalDodge += game.dodged;
+  saveData.coins += game.coins;
+  if (dist > saveData.bestDistance) saveData.bestDistance = dist;
+  saveSave();
+
+  // Show game over screen
+  document.getElementById('goDistance').textContent = dist;
+  document.getElementById('goCoins').textContent = game.coins;
+  document.getElementById('goScore').textContent = game.score;
+  document.getElementById('goBest').textContent = saveData.bestDistance;
+
+  setTimeout(() => {
+    showScreen('gameOverScreen');
+  }, 500);
+}
+
+function quitGame() {
+  if (gameLoop) cancelAnimationFrame(gameLoop);
+  game = null;
+  paused = false;
+  document.getElementById('pauseOverlay').classList.remove('active');
+  showScreen('menuScreen');
+}
+
+function togglePause() {
+  paused = !paused;
+  document.getElementById('pauseOverlay').classList.toggle('active', paused);
+}
+
+// ==================== CONTROLS ====================
+// Keyboard
+document.addEventListener('keydown', e => {
+  if (!game || !game.alive) return;
+  if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') game.moveLeft = true;
+  if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') game.moveRight = true;
+  if (e.key === 'Escape' || e.key === 'p' || e.key === 'P') togglePause();
+  if (e.key === '1') usePowerup('magnet');
+  if (e.key === '2') usePowerup('shield');
+  if (e.key === '3') usePowerup('fuel');
+  if (e.key === '4') usePowerup('thunder');
+});
+
+document.addEventListener('keyup', e => {
+  if (!game) return;
+  if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') game.moveLeft = false;
+  if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') game.moveRight = false;
+});
+
+// Touch controls for game canvas
+const gameCanvas = document.getElementById('gameCanvas');
+gameCanvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  if (!game || !game.alive) return;
+  const touch = e.touches[0];
+  game.touchStartX = touch.clientX;
+  game.touchCurrentX = touch.clientX;
+  game.touching = true;
+}, { passive: false });
+
+gameCanvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (!game || !game.alive) return;
+  game.touchCurrentX = e.touches[0].clientX;
+}, { passive: false });
+
+gameCanvas.addEventListener('touchend', e => {
+  e.preventDefault();
+  if (!game) return;
+  game.touching = false;
+}, { passive: false });
+
+// Mouse fallback for desktop
+gameCanvas.addEventListener('mousedown', e => {
+  if (!game || !game.alive) return;
+  game.touchStartX = e.clientX;
+  game.touchCurrentX = e.clientX;
+  game.touching = true;
+});
+
+gameCanvas.addEventListener('mousemove', e => {
+  if (!game || !game.alive) return;
+  if (game.touching) game.touchCurrentX = e.clientX;
+});
+
+gameCanvas.addEventListener('mouseup', () => {
+  if (!game) return;
+  game.touching = false;
+});
+
+// ==================== MOBILE VIEWPORT FIX ====================
+function setVH() {
+  const vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty('--vh', `${vh}px`);
+}
+setVH();
+
+// Use visualViewport API if available (mobile browsers)
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => {
+    setVH();
+    if (game && game.alive) {
+      const canvas = game.canvas;
+      game.W = window.visualViewport.width;
+      game.H = window.visualViewport.height;
+      canvas.width = game.W;
+      canvas.height = game.H;
+      game.roadW = game.laneW * game.laneCount;
+      game.roadX = (game.W - game.roadW) / 2;
+      game.py = game.H - 140;
+    }
+  });
+}
+
+// Prevent pull-to-refresh and bounce on game screen
+document.addEventListener('touchmove', function(e) {
+  if (game && game.alive && currentScreen === 'gameScreen') {
+    e.preventDefault();
+  }
+}, { passive: false });
+
+// Prevent context menu on long press (mobile)
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// ==================== INIT ====================
+loadSave();
+updateAllUI();
+
+// Handle resize
+window.addEventListener('resize', () => {
+  setVH();
+  if (game && game.alive) {
+    const canvas = game.canvas;
+    game.W = window.innerWidth;
+    game.H = window.innerHeight;
+    canvas.width = game.W;
+    canvas.height = game.H;
+    game.roadW = game.laneW * game.laneCount;
+    game.roadX = (game.W - game.roadW) / 2;
+    game.py = game.H - 140;
+  }
+});
+</script>
+</body>
+</html>
