@@ -1528,14 +1528,15 @@ function gameUpdate() {
 
   // Player movement
   if (g.touching && g.touchTargetX !== null) {
-    // Touch: position-following mode — car moves toward finger X
+    // Touch: position-following — car snaps to finger X with minimal delay
     const targetX = g.touchTargetX - g.pw / 2;
     const clamped = Math.max(g.roadX + 5, Math.min(g.roadX + g.roadW - g.pw - 5, targetX));
     const dx = clamped - g.px;
-    // High responsiveness: move 35% of distance each frame, minimum 2px
-    const move = dx * 0.35;
-    g.px += Math.abs(move) < 2 ? Math.sign(move) * Math.min(2, Math.abs(dx)) : move;
-    // Final clamp
+    const absDx = Math.abs(dx);
+    // Dynamic lerp: 0.85 when far away (instant snap), eases to 0.25 near target (smooth stop)
+    const factor = absDx > 40 ? 0.85 : absDx > 10 ? 0.65 : absDx > 2 ? 0.45 : 0.25;
+    const move = dx * factor;
+    g.px += absDx > 0.5 ? (Math.abs(move) < 1 ? Math.sign(dx) * Math.min(1, absDx) : move) : 0;
     g.px = Math.max(g.roadX + 5, Math.min(g.roadX + g.roadW - g.pw - 5, g.px));
   } else {
     // Keyboard: direction-based movement
