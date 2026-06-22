@@ -1381,8 +1381,7 @@ function startGame() {
     // Controls
     moveLeft: false,
     moveRight: false,
-    touchStartX: 0,
-    touchCurrentX: 0,
+    touchTargetX: null,
     touching: false,
     // Stats
     dodged: 0,
@@ -1528,21 +1527,24 @@ function gameUpdate() {
   }
 
   // Player movement
-  let moveDir = 0;
-  if (g.moveLeft) moveDir -= 1;
-  if (g.moveRight) moveDir += 1;
-  if (g.touching) {
-    const dx = g.touchCurrentX - g.touchStartX;
-    if (Math.abs(dx) > 10) {
-      moveDir = dx > 0 ? 1 : -1;
-      // Proportional control
-      const ratio = Math.min(1, Math.abs(dx) / 80);
-      moveDir *= ratio;
-    }
+  if (g.touching && g.touchTargetX !== null) {
+    // Touch: position-following mode — car moves toward finger X
+    const targetX = g.touchTargetX - g.pw / 2;
+    const clamped = Math.max(g.roadX + 5, Math.min(g.roadX + g.roadW - g.pw - 5, targetX));
+    const dx = clamped - g.px;
+    // High responsiveness: move 35% of distance each frame, minimum 2px
+    const move = dx * 0.35;
+    g.px += Math.abs(move) < 2 ? Math.sign(move) * Math.min(2, Math.abs(dx)) : move;
+    // Final clamp
+    g.px = Math.max(g.roadX + 5, Math.min(g.roadX + g.roadW - g.pw - 5, g.px));
+  } else {
+    // Keyboard: direction-based movement
+    let moveDir = 0;
+    if (g.moveLeft) moveDir -= 1;
+    if (g.moveRight) moveDir += 1;
+    g.px += moveDir * g.handling;
+    g.px = Math.max(g.roadX + 5, Math.min(g.roadX + g.roadW - g.pw - 5, g.px));
   }
-  g.px += moveDir * g.handling;
-  // Clamp to road
-  g.px = Math.max(g.roadX + 5, Math.min(g.roadX + g.roadW - g.pw - 5, g.px));
 
   // Distance & score
   g.distance += g.pSpeed * 0.5;
@@ -1994,45 +1996,44 @@ document.addEventListener('keyup', e => {
   if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') game.moveRight = false;
 });
 
-// Touch controls for game canvas
+// Touch controls for game canvas — position-following mode
 const gameCanvas = document.getElementById('gameCanvas');
 gameCanvas.addEventListener('touchstart', e => {
   e.preventDefault();
   if (!game || !game.alive) return;
-  const touch = e.touches[0];
-  game.touchStartX = touch.clientX;
-  game.touchCurrentX = touch.clientX;
+  game.touchTargetX = e.touches[0].clientX;
   game.touching = true;
 }, { passive: false });
 
 gameCanvas.addEventListener('touchmove', e => {
   e.preventDefault();
   if (!game || !game.alive) return;
-  game.touchCurrentX = e.touches[0].clientX;
+  game.touchTargetX = e.touches[0].clientX;
 }, { passive: false });
 
 gameCanvas.addEventListener('touchend', e => {
   e.preventDefault();
   if (!game) return;
   game.touching = false;
+  game.touchTargetX = null;
 }, { passive: false });
 
 // Mouse fallback for desktop
 gameCanvas.addEventListener('mousedown', e => {
   if (!game || !game.alive) return;
-  game.touchStartX = e.clientX;
-  game.touchCurrentX = e.clientX;
+  game.touchTargetX = e.clientX;
   game.touching = true;
 });
 
 gameCanvas.addEventListener('mousemove', e => {
   if (!game || !game.alive) return;
-  if (game.touching) game.touchCurrentX = e.clientX;
+  if (game.touching) game.touchTargetX = e.clientX;
 });
 
 gameCanvas.addEventListener('mouseup', () => {
   if (!game) return;
   game.touching = false;
+  game.touchTargetX = null;
 });
 
 // ==================== MOBILE VIEWPORT FIX ====================
