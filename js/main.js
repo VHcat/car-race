@@ -8,6 +8,7 @@ document.addEventListener('keydown', e=>{
   if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A') g.moveLeft = true;
   if(e.key==='ArrowRight' || e.key==='d' || e.key==='D') g.moveRight = true;
   if(e.key===' ' || e.key==='ArrowUp' || e.key==='w' || e.key==='W'){ g.nitroHeld = true; e.preventDefault(); }
+  if(e.key==='f' || e.key==='F' || e.key==='Shift'){ g.flyHeld = true; }
   if(e.key==='Escape' || e.key==='p' || e.key==='P') Game.togglePause();
   const idx = '123456'.indexOf(e.key);
   if(idx >= 0) Game.usePowerup(Game.PU_ORDER[idx]);
@@ -18,11 +19,12 @@ document.addEventListener('keyup', e=>{
   if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A') g.moveLeft = false;
   if(e.key==='ArrowRight' || e.key==='d' || e.key==='D') g.moveRight = false;
   if(e.key===' ' || e.key==='ArrowUp' || e.key==='w' || e.key==='W') g.nitroHeld = false;
+  if(e.key==='f' || e.key==='F' || e.key==='Shift') g.flyHeld = false;
 });
 /* 窗口失焦时按键可能收不到 keyup，清掉所有输入状态避免自动转向 */
 window.addEventListener('blur', ()=>{
   const g = Game.g;
-  if(g){ g.moveLeft = false; g.moveRight = false; g.nitroHeld = false; }
+  if(g){ g.moveLeft = false; g.moveRight = false; g.nitroHeld = false; g.flyHeld = false; }
 });
 
 /* ---- 触屏 / 鼠标转向（位置跟随） ---- */
@@ -84,6 +86,21 @@ nitroBtn.addEventListener('pointerdown', e=>{
   });
 });
 nitroBtn.addEventListener('contextmenu', e=>e.preventDefault());
+
+/* ---- 飞行按钮（长按） ---- */
+const flyBtn = $('flyBtn');
+flyBtn.addEventListener('pointerdown', e=>{
+  e.preventDefault();
+  const g = Game.g;
+  if(g && g.state==='run') g.flyHeld = true;
+});
+['pointerup','pointerleave','pointercancel'].forEach(ev=>{
+  flyBtn.addEventListener(ev, ()=>{
+    const g = Game.g;
+    if(g) g.flyHeld = false;
+  });
+});
+flyBtn.addEventListener('contextmenu', e=>e.preventDefault());
 
 /* ---- 暂停按钮 ---- */
 $('pauseBtn').addEventListener('click', e=>{ Game.togglePause(); e.currentTarget.blur(); });

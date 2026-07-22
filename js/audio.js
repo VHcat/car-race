@@ -73,6 +73,9 @@ const AudioSys = {
   win(){ [523,659,784,1047,1319].forEach((f,i)=>this.tone(f,.12,'square',.28,0,i*.08)); },
   lowFuel(){ this.tone(233,.13,'square',.28); this.tone(233,.13,'square',.28,0,.2); },
   spin(){ this.tone(700,.05,'square',.12); },
+  takeoff(){ this.noise(.5,.28,600,1,0,2600); this.tone(240,.42,'triangle',.25,560); },
+  land(){ this.noise(.16,.3,320,.8); this.tone(130,.12,'sine',.3,-50); },
+  armorHit(){ this.noise(.26,.5,520,.9); this.tone(170,.16,'square',.32,-90); },
   /* ---- engine hum ---- */
   setEngine(ratio, nitro){
     if(!this.ctx) return;

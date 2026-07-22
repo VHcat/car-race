@@ -82,6 +82,32 @@ const GEM_ITEMS = [
   {id:'startNitro', name:'氮气胶囊', emoji:'🚀', desc:'下一场比赛满氮气出发',   price:8},
   {id:'coinX2',     name:'幸运金币', emoji:'🍀', desc:'下一场比赛金币 ×2',      price:12},
 ];
+/* 改装零件：wing 为主动装置（长按飞行），其余为被动零件 */
+const PARTS = [
+  {id:'wing', name:'飞翼装置', emoji:'🪽', type:'active', gem:18, maxLv:5,
+   desc:'长按 FLY 键腾空飞行，飞行时无视来车碰撞',
+   lvDesc:lv=>`可持续飞行 ${(2+lv*.6).toFixed(1)} 秒`},
+  {id:'armor', name:'装甲板', emoji:'🦾', type:'passive', price:600, maxLv:5,
+   desc:'加厚车身，每局可硬扛来车撞击',
+   lvDesc:lv=>`每局抵挡 ${1+Math.floor((lv-1)/2)} 次碰撞`},
+  {id:'fueltank', name:'强化油箱', emoji:'⛽', type:'passive', price:500, maxLv:5,
+   desc:'更大油箱，跑得更远',
+   lvDesc:lv=>`油量上限 ${100+lv*12}`},
+  {id:'magnetp', name:'钕磁铁', emoji:'🧲', type:'passive', price:800, maxLv:5,
+   desc:'开局自带磁力吸附金币',
+   lvDesc:lv=>`开局磁铁 ${(4+lv*2)} 秒`},
+  {id:'coinchip', name:'金币芯片', emoji:'💰', type:'passive', price:900, maxLv:5,
+   desc:'永久提升金币收益率',
+   lvDesc:lv=>`金币收益 +${lv*10}%`},
+  {id:'turbo', name:'涡轮机', emoji:'🌀', type:'passive', price:1200, maxLv:5,
+   desc:'提升极速，但操控略微下降',
+   lvDesc:lv=>`极速 +${lv*4}% · 操控 -${lv*3}%`},
+  {id:'nitrorec', name:'氮气回收器', emoji:'♻️', type:'passive', price:700, maxLv:5,
+   desc:'行驶中缓慢回收氮气',
+   lvDesc:lv=>`氮气每秒回复 +${(lv*1.2).toFixed(1)}`},
+];
+const partSlots = lv=>2 + (lv>=5?1:0) + (lv>=10?1:0);
+const partUpCost = (p, lv)=> p.gem ? 3+lv*2 : Math.round(p.price*(.5+lv*.35));
 const REWARDS = [
   {day:1, icon:'🪙', amount:100},{day:2, icon:'🪙', amount:150},{day:3, icon:'🧲', amount:1, type:'magnet'},
   {day:4, icon:'🪙', amount:200},{day:5, icon:'🛡️', amount:1, type:'shield'},{day:6, icon:'🪙', amount:300},

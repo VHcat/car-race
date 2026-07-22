@@ -51,6 +51,9 @@
       <button class="pit-btn" onclick="UI.go('garageScreen')">
         <span class="pb-ico">🔧</span><span class="pb-txt"><b>车库</b><i>选车 · 改装升级</i></span><span class="pb-arrow">›</span>
       </button>
+      <button class="pit-btn" onclick="UI.go('modScreen')">
+        <span class="pb-ico">🔩</span><span class="pb-txt"><b>改装车间</b><i>零件 · 飞翼装置</i></span><span class="pb-arrow">›</span>
+      </button>
       <button class="pit-btn" onclick="UI.go('shopScreen')">
         <span class="pb-ico">🛒</span><span class="pb-txt"><b>商店</b><i>道具 · 增益卡</i></span><span class="pb-arrow">›</span>
       </button>
@@ -112,9 +115,11 @@
         <button class="nitro-btn" id="nitroBtn"><span>NOS</span></button>
         <div class="pu-row" id="puRow"></div>
         <div class="hud-side">
+          <button class="fly-btn" id="flyBtn" hidden><span>FLY</span></button>
           <span id="hudShieldIco">🛡️</span>
           <span class="hud-mini" id="hudX2">✖2</span>
           <span class="hud-mini" id="hudSlow">⏳</span>
+          <span class="hud-mini" id="hudArmor">🦾×1</span>
         </div>
       </div>
     </div>
@@ -156,6 +161,21 @@
     <span class="chip chip-purple">💎 <span class="num" id="shopGems">0</span></span>
   </div>
   <div class="scroll-area" id="shopScroll"></div>
+</div>
+
+<!-- ================= MOD (改装车间) ================= -->
+<div class="screen subscreen" id="modScreen">
+  <div class="sub-head">
+    <button class="back-btn" onclick="UI.go('menuScreen')">‹ 返回</button>
+    <h2>改装车间</h2>
+    <span class="chip chip-gold">🪙 <span class="num" id="modCoins">0</span></span>
+    <span class="chip chip-purple">💎 <span class="num" id="modGems">0</span></span>
+  </div>
+  <div class="scroll-area">
+    <div class="mod-slots" id="modSlots"></div>
+    <div class="shop-grid" id="modGrid"></div>
+    <div class="rw-note">零件需装备后才生效 · 升级提升效果 · LV.5 与 LV.10 各解锁一个槽位</div>
+  </div>
 </div>
 
 <!-- ================= BANK ================= -->
@@ -250,7 +270,7 @@
       <button class="rbtn rbtn-red rbtn-sm" onclick="Settings.confirmReset()"><span>🗑️ 重置所有数据</span></button>
     </div>
   </div>
-  <div class="set-about">Come on! Racing v2.0<br>纯前端 · 零依赖 · 进度自动保存在本地</div>
+  <div class="set-about">Come on! Racing v2.1<br>纯前端 · 零依赖 · 进度自动保存在本地</div>
 </div>
 
 <!-- ================= GAME OVER ================= -->

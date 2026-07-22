@@ -3,6 +3,7 @@ const SAVE_KEY = 'carRaceSave';
 const SAVE_DEF = {
   v:2, coins:200, gems:10, xp:0, level:1,
   selectedCar:0, ownedCars:[0], upgrades:{},
+  parts:{}, equipped:[],
   powerups:{magnet:2, shield:1, fuel:2, thunder:1, x2coin:0, slowmo:0},
   buffs:{startNitro:0, coinX2:0},
   bestDistance:0, bestPerRoad:{},
@@ -27,7 +28,11 @@ function loadSave(){
   }
   if(!Array.isArray(S.ownedCars) || !S.ownedCars.length) S.ownedCars=[0];
   if(!S.ownedCars.includes(S.selectedCar)) S.selectedCar = S.ownedCars[0];
+  if(!Array.isArray(S.equipped)) S.equipped = [];
+  S.equipped = S.equipped.filter(id=> (S.parts[id]||0) > 0).slice(0, partSlots(S.level));
 }
+/* 已装备零件等级；未装备或未拥有返回 0 */
+function partLv(id){ return S.equipped.includes(id) ? (S.parts[id]||0) : 0; }
 let saveWarned = false;
 function save(){
   try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }

@@ -12,6 +12,7 @@ const UI = {
     if(id==='menuScreen'){ MenuScene.start(); this.updateMenu(); } else MenuScene.stop();
     if(id==='roadScreen') this.updateRoad();
     if(id==='garageScreen') Garage.open();
+    if(id==='modScreen') Mod.render();
     if(id==='shopScreen') Shop.render();
     if(id==='bankScreen') Bank.render();
     if(id==='rewardScreen') Rewards.render();
@@ -88,11 +89,12 @@ const UI = {
     if(S.buffs.coinX2 > 0) buffs.insertAdjacentHTML('beforeend', `<span class="buff-chip">🍀 金币翻倍 ×${S.buffs.coinX2}</span>`);
   },
   updateWallets(){
-    ['menuCoins','roadCoins','garageCoins','shopCoins','bankCoins','rewardCoins','missionCoins'].forEach(id=>{
+    ['menuCoins','roadCoins','garageCoins','shopCoins','bankCoins','rewardCoins','missionCoins','modCoins'].forEach(id=>{
       const el = $(id); if(el) el.textContent = fmt(S.coins);
     });
     const g = $('shopGems'); if(g) g.textContent = fmt(S.gems);
     const gm = $('menuGems'); if(gm) gm.textContent = fmt(S.gems);
+    const mg = $('modGems'); if(mg) mg.textContent = fmt(S.gems);
   },
   grantXp(amount){
     S.xp += amount;
@@ -396,6 +398,104 @@ const Shop = {
     S.buffs[it.id] = (S.buffs[it.id]||0) + 1;
     save(); AudioSys.buy();
     UI.toast(`购入 ${it.emoji} ${it.name}，下场比赛生效`);
+    this.render();
+  },
+};
+
+/* ================= 改装车间 ================= */
+const Mod = {
+  render(){
+    const slots = partSlots(S.level);
+    const used = S.equipped.length;
+    const nextAt = S.level < 5 ? 'LV.5' : S.level < 10 ? 'LV.10' : null;
+    let dots = '';
+    for(let i=0;i<slots;i++) dots += `<i class="ms-dot${i<used?' used':''}"></i>`;
+    $('modSlots').innerHTML = `
+      <span class="ms-ico">🔩</span>
+      <span class="ms-txt">改装槽位 ${used} / ${slots}<i>${nextAt ? `升级至 ${nextAt} 解锁下一个槽位` : '槽位已全部解锁'}</i></span>
+      <span class="ms-dots">${dots}</span>`;
+    const grid = $('modGrid');
+    grid.innerHTML = '';
+    PARTS.forEach(p=>{
+      const lv = S.parts[p.id] || 0;
+      const owned = lv > 0;
+      const equipped = S.equipped.includes(p.id);
+      const slotsFull = used >= slots;
+      const el = document.createElement('div');
+      el.className = 'shop-card mod-card' + (p.type==='active'?' is-active':'') + (equipped?' equipped':'');
+      let pips = '';
+      for(let i=1;i<=p.maxLv;i++) pips += `<i class="${i<=lv?'on':''}"></i>`;
+      let btns = '';
+      if(!owned){
+        const cost = p.gem ? `💎 ${p.gem}` : `🪙 ${p.price}`;
+        const poor = p.gem ? S.gems < p.gem : S.coins < p.price;
+        btns = `<button class="mc-btn" ${poor?'disabled':''}>购入 ${cost}</button>`;
+      } else {
+        if(lv < p.maxLv){
+          const cost = partUpCost(p, lv);
+          const poor = p.gem ? S.gems < cost : S.coins < cost;
+          btns += `<button class="mc-btn up-btn" ${poor?'disabled':''}>升级 ${p.gem?'💎':'🪙'} ${cost}</button>`;
+        } else {
+          btns += `<button class="mc-btn" disabled>已满级</button>`;
+        }
+        btns += equipped
+          ? `<button class="mc-btn off-btn">卸下</button>`
+          : `<button class="mc-btn eq-btn" ${slotsFull?'disabled':''}>${slotsFull?'槽位满':'装备'}</button>`;
+      }
+      el.innerHTML = `
+        ${equipped ? '<span class="mc-tag eq">已装备</span>' : p.type==='active' ? '<span class="mc-tag">主动装置</span>' : ''}
+        <div class="sc-ico">${p.emoji}</div>
+        <div class="sc-name">${p.name}</div>
+        <div class="sc-desc">${p.desc}</div>
+        <div class="mc-lv"><span class="mod-pips">${pips}</span>Lv.${lv}/${p.maxLv}</div>
+        <div class="mc-eff">${owned ? p.lvDesc(lv) : 'Lv.1 效果：' + p.lvDesc(1)}</div>
+        <div class="mc-btns">${btns}</div>`;
+      const b = el.querySelectorAll('.mc-btn');
+      if(!owned){
+        b[0].addEventListener('click', ()=>this.buy(p));
+      } else {
+        b[0].addEventListener('click', ()=>this.up(p));
+        b[1].addEventListener('click', ()=>this.toggleEquip(p));
+      }
+      grid.appendChild(el);
+    });
+    UI.updateWallets();
+  },
+  buy(p){
+    if(p.gem){ if(S.gems < p.gem){ UI.toast('钻石不足！完成任务和签到可获得钻石'); return; } S.gems -= p.gem; }
+    else { if(S.coins < p.price){ UI.toast('金币不足！去跑几圈赚点钱吧'); return; } S.coins -= p.price; }
+    S.parts[p.id] = 1;
+    if(S.equipped.length < partSlots(S.level)){
+      S.equipped.push(p.id);
+      UI.toast(`🔧 购入并装备 ${p.emoji} ${p.name}！`);
+    } else {
+      UI.toast(`🔧 购入 ${p.emoji} ${p.name}！槽位已满，记得卸下旧零件`);
+    }
+    save(); AudioSys.win(); buzz([25,35]);
+    this.render();
+  },
+  up(p){
+    const lv = S.parts[p.id] || 0;
+    if(lv <= 0 || lv >= p.maxLv) return;
+    const cost = partUpCost(p, lv);
+    if(p.gem){ if(S.gems < cost){ UI.toast('钻石不足！'); return; } S.gems -= cost; }
+    else { if(S.coins < cost){ UI.toast('金币不足！'); return; } S.coins -= cost; }
+    S.parts[p.id] = lv + 1;
+    save(); AudioSys.buy(); buzz(20);
+    UI.toast(`⬆️ ${p.emoji} ${p.name} 升级至 Lv.${lv+1}`);
+    this.render();
+  },
+  toggleEquip(p){
+    const i = S.equipped.indexOf(p.id);
+    if(i >= 0){
+      S.equipped.splice(i, 1);
+      UI.toast(`已卸下 ${p.emoji} ${p.name}`);
+    } else {
+      if(S.equipped.length >= partSlots(S.level)){ UI.toast('槽位已满，先卸下其他零件'); return; }
+      S.equipped.push(p.id);
+      UI.toast(`已装备 ${p.emoji} ${p.name}！`);
+    }
+    save(); AudioSys.click();
     this.render();
   },
 };

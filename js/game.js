@@ -25,25 +25,33 @@ const Game = {
     const pw = laneW*.52, ph = pw*1.7;
     const startNitroBuff = S.buffs.startNitro > 0;
     const coinX2Buff = S.buffs.coinX2 > 0;
+    /* 改装零件（仅已装备的生效） */
+    const wingLv = partLv('wing'), armorLv = partLv('armor'), tankLv = partLv('fueltank');
+    const magLv = partLv('magnetp'), chipLv = partLv('coinchip'), turboLv = partLv('turbo'), recLv = partLv('nitrorec');
+    const fuelCap = 100 + tankLv*12;
 
     this.g = {
       road, car, themeKey:road.theme, th:THEMES[road.theme],
       laneCount:road.lanes, laneW, roadW, roadX:(this.W-roadW)/2,
       px: this.W/2 - pw/2, py: this.H - ph - 128, pw, ph,
       pSpeed:0, vx:0, tilt:0,
-      maxSpeed: 3.1 + eff('speed')*.5,
+      maxSpeed: (3.1 + eff('speed')*.5) * (1+turboLv*.04),
       accelRate: .016 + eff('accel')*.0038,
-      handling: 2.1 + eff('handling')*.42,
+      handling: (2.1 + eff('handling')*.42) * (1-turboLv*.03),
       nitroPower: 1.45 + eff('nitro')*.05,
       nitroDrain: Math.max(13, 30 - eff('nitro')*1.1)/60,
-      fuel:100, fuelDrain: .017 + road.traffic*.004,
+      nitroRegen: recLv*1.2/60,
+      fuel:fuelCap, fuelCap, fuelDrain: .017 + road.traffic*.004,
       distance:0, dashScroll:0, coins:0, bonusScore:0, score:0,
       combo:0, comboTimer:0,
       nitro: startNitroBuff ? 100 : 30, nitroActive:false,
       enemies:[], coinsArr:[], items:[], particles:[], floats:[],
       scenery:[], weather:[], ice:[],
       enemyTimer:0, coinTimer:0, itemTimer: irand(300,500), sceneryTimer:0,
-      magnetTimer:0, shield:false, x2Timer:0, slowTimer:0, invincibleTimer:0,
+      magnetTimer: magLv ? (4+magLv*2)*60 : 0, shield:false, x2Timer:0, slowTimer:0, invincibleTimer:0,
+      coinChip: 1 + chipLv*.1,
+      armorHits: armorLv ? 1+Math.floor((armorLv-1)/2) : 0,
+      wingLv, flyEnergy:100, flying:false, flyAlt:0, flyHeld:false, flyDur:(2+wingLv*.6)*60,
       state:'countdown', countT:3.3, dieT:0, dieReason:'',
       shake:0, timeScale:1,
       reviveUsed:false, coinX2Buff, startNitroBuff,
@@ -61,6 +69,11 @@ const Game = {
     this.buildPuRow();
     this.updateHud(true);
     $('hudCombo').classList.remove('on');
+    $('flyBtn').hidden = wingLv <= 0;
+    $('flyBtn').classList.remove('flying');
+    $('touchHint').textContent = wingLv > 0
+      ? '👆 左右拖动转向 · 长按 NOS 氮气 · 长按 FLY 飞越来车'
+      : '👆 左右拖动控制方向 · 长按 NOS 氮气加速';
     $('touchHint').classList.toggle('on', true);
     const runRef = this.g;
     setTimeout(()=>{ if(this.g === runRef) $('touchHint').classList.remove('on'); }, 3800);
@@ -136,6 +149,8 @@ const Game = {
     $('hudShieldIco').classList.toggle('on', this.g.shield);
     $('hudX2').classList.toggle('on', this.g.x2Timer>0);
     $('hudSlow').classList.toggle('on', this.g.slowTimer>0);
+    $('hudArmor').classList.toggle('on', this.g.armorHits>0);
+    $('hudArmor').textContent = '🦾×' + this.g.armorHits;
   },
   usePowerup(id){
     const g = this.g;
@@ -147,7 +162,7 @@ const Game = {
     switch(id){
       case 'magnet': g.magnetTimer = 15*60; UI.toast('🧲 磁铁激活！'); AudioSys.pickup(); break;
       case 'shield': g.shield = true; UI.toast('🛡️ 保护盾就绪！'); AudioSys.shield(); break;
-      case 'fuel': g.fuel = Math.min(100, g.fuel+35); UI.toast('⛽ 油量 +35%'); AudioSys.fuelUp(); break;
+      case 'fuel': g.fuel = Math.min(g.fuelCap, g.fuel+35); UI.toast('⛽ 油量 +35%'); AudioSys.fuelUp(); break;
       case 'thunder':
         g.enemies.forEach(e=>{ this.explode(e.x+e.w/2, e.y+e.h/2); g.coins++; g.bonusScore+=10; });
         if(g.enemies.length) feed('coins', g.enemies.length);
@@ -219,6 +234,7 @@ const Game = {
     }
     const acc = g.accelRate * (g.nitroActive ? 2.4 : 1) * dt;
     g.pSpeed += clamp(target - g.pSpeed, -0.14*dt, acc);
+    if(g.nitroRegen) g.nitro = Math.min(100, g.nitro + g.nitroRegen*dt);
     $('nitroBtn').classList.toggle('firing', g.nitroActive);
     $('nitroBtn').style.setProperty('--n', g.nitro);
 
@@ -228,6 +244,39 @@ const Game = {
     if(g.fuel <= 10 && !g.lowWarn10){ g.lowWarn10=true; AudioSys.lowFuel(); buzz(60); }
     $('fuelTrack').classList.toggle('low', g.fuel<=25);
     if(g.fuel <= 0){ g.fuel = 0; this.die('fuel'); return; }
+
+    /* ---- 飞行（飞翼装置） ---- */
+    if(g.wingLv > 0){
+      if(g.flyHeld && !g.flying && g.flyEnergy >= 15){
+        g.flying = true;
+        AudioSys.takeoff();
+        this.addFloat(g.px+g.pw/2, g.py-18, '起飞!', '#f7b731', 15);
+        buzz(20);
+      }
+      if(g.flying && (!g.flyHeld || g.flyEnergy <= 0)) g.flying = false;
+      if(g.flying){
+        g.flyAlt = Math.min(1, g.flyAlt + .09*dt);
+        g.flyEnergy = Math.max(0, g.flyEnergy - 100/g.flyDur*dt);
+        g.fuel -= g.fuelDrain*.6*dt;
+        if(S.settings.quality==='high' && g.frame%3===0){
+          g.particles.push({x:g.px+rand(0,g.pw), y:g.py+g.ph, vx:rand(-.6,.6), vy:rand(3,5),
+            life:16, color:'rgba(255,255,255,.5)', size:rand(1.5,3)});
+        }
+      } else {
+        const wasAir = g.flyAlt > .3;
+        g.flyAlt = Math.max(0, g.flyAlt - .11*dt);
+        if(wasAir && g.flyAlt <= .3){
+          g.invincibleTimer = Math.max(g.invincibleTimer, 40);
+          AudioSys.land();
+          for(let i=0;i<8;i++){
+            g.particles.push({x:g.px+rand(0,g.pw), y:g.py+g.ph-4, vx:rand(-2.4,2.4), vy:rand(-1.5,.5),
+              life:rand(14,24), color:'rgba(190,190,190,.7)', size:rand(2,4)});
+          }
+        }
+        g.flyEnergy = Math.min(100, g.flyEnergy + .3*dt);
+      }
+      if(g.fuel <= 0){ g.fuel = 0; this.die('fuel'); return; }
+    }
 
     /* ---- 玩家移动 ---- */
     const prevX = g.px;
@@ -268,7 +317,7 @@ const Game = {
     g.score = Math.floor(g.distance*.1 + g.bonusScore);
     if(g.distance >= g.checkpointNext){
       g.checkpointNext += 500;
-      g.fuel = Math.min(100, g.fuel + 10);
+      g.fuel = Math.min(g.fuelCap, g.fuel + 10);
       const bonus = Math.round(15*g.road.coinMul);
       g.coins += bonus;
       feed('coins', bonus);
@@ -347,7 +396,7 @@ const Game = {
         feed('dodge', 1);
         g.bonusScore += 5;
         const gapX = Math.abs((e.x+e.w/2) - (g.px+g.pw/2));
-        if(!e.nearDone && gapX < g.laneW*1.12 && e.speed < g.pSpeed){
+        if(!e.nearDone && gapX < g.laneW*1.12 && e.speed < g.pSpeed && g.flyAlt < .35){
           e.nearDone = true;
           g.combo++;
           g.comboTimer = 220;
@@ -399,7 +448,7 @@ const Game = {
       return true;
     });
     /* ---- 金币碰撞 ---- */
-    const mult = (g.x2Timer>0?2:1) * (g.coinX2Buff?2:1);
+    const mult = (g.x2Timer>0?2:1) * (g.coinX2Buff?2:1) * g.coinChip;
     for(const c of g.coinsArr){
       if(!c.got && rectOverlap(g.px, g.py, g.pw, g.ph, c.x-c.size/2, c.y-c.size/2, c.size, c.size)){
         c.got = true;
@@ -413,7 +462,7 @@ const Game = {
         g.nitro = Math.min(100, g.nitro + 2);
         AudioSys.coin();
         this.coinBurst(c.x, c.y);
-        if(mult>1) this.addFloat(c.x, c.y-14, `+${mult}×${mult}`, '#f7b731', 14);
+        if(mult>1) this.addFloat(c.x, c.y-14, `+${Number.isInteger(mult)?mult:mult.toFixed(1)}`, '#f7b731', 14);
       }
     }
 
@@ -425,7 +474,7 @@ const Game = {
     if(g.frame%20===0) this.updatePuRow();
 
     /* ---- 敌车碰撞 ---- */
-    if(g.invincibleTimer <= 0){
+    if(g.invincibleTimer <= 0 && g.flyAlt < .35){
       for(const e of g.enemies){
         if(rectOverlap(g.px+5, g.py+5, g.pw-10, g.ph-10, e.x+4, e.y+4, e.w-8, e.h-8)){
           if(g.nitroActive){
@@ -441,6 +490,17 @@ const Game = {
             this.addFloat(e.x+e.w/2, e.y, '撞飞! +5🪙', '#35e0ff', 16);
             AudioSys.ram();
             buzz(35);
+            break;
+          } else if(g.armorHits > 0){
+            g.armorHits--;
+            g.invincibleTimer = 60;
+            this.explode(e.x+e.w/2, e.y+e.h/2);
+            g.enemies = g.enemies.filter(o=>o!==e);
+            g.shake = Math.max(g.shake, 6);
+            this.addFloat(g.px+g.pw/2, g.py-20, `🦾 装甲抵挡! 剩余${g.armorHits}次`, '#3ddc84', 14);
+            AudioSys.armorHit();
+            buzz(45);
+            this.updatePuRow();
             break;
           } else if(g.shield){
             g.shield = false;
@@ -617,6 +677,7 @@ const Game = {
     g.dieT = 55;
     g.timeScale = .22;
     g.shake = 16;
+    g.flying = false; g.flyAlt = 0; g.flyHeld = false;
     if(reason==='crash'){
       this.explode(g.px+g.pw/2, g.py+g.ph/2);
       AudioSys.crash();
@@ -734,9 +795,15 @@ const Game = {
     $('hudDist').textContent = fmt(g.distance);
     $('hudCoins').textContent = fmt(g.coins);
     $('hudScore').textContent = fmt(g.score);
-    $('fuelFill').style.width = g.fuel + '%';
+    $('fuelFill').style.width = (g.fuel/g.fuelCap*100) + '%';
     $('fuelNum').textContent = Math.ceil(g.fuel);
     $('nitroBtn').style.setProperty('--n', g.nitro);
+    if(g.wingLv > 0){
+      const fb = $('flyBtn');
+      fb.style.setProperty('--fe', g.flyEnergy);
+      fb.classList.toggle('flying', g.flying);
+      fb.classList.toggle('empty', g.flyEnergy < 15);
+    }
   },
 
   /* ---------- 渲染 ---------- */
@@ -909,20 +976,61 @@ const Game = {
     }
     /* 玩家 */
     const blinkOff = g.invincibleTimer>0 && Math.floor(g.frame/4)%2===0;
+    const lift = (g.flyAlt||0) * 46;
+    const fsc = 1 + (g.flyAlt||0)*.16;
     if(!blinkOff){
-      drawCar(c, g.px, g.py, g.pw, g.ph, g.car, {tilt:g.tilt, flame:g.nitroActive});
+      if(g.flyAlt > .03){
+        /* 地面投影阴影 */
+        c.fillStyle = `rgba(0,0,0,${.32*(1-g.flyAlt*.4)})`;
+        c.beginPath();
+        c.ellipse(g.px+g.pw/2, g.py+g.ph-3, g.pw*.6*(1-g.flyAlt*.22), g.pw*.22*(1-g.flyAlt*.22), 0, 0, Math.PI*2);
+        c.fill();
+      }
+      const dx = g.px - (fsc-1)*g.pw/2, dy = g.py - lift - (fsc-1)*g.ph/2;
+      const dw = g.pw*fsc, dh = g.ph*fsc;
+      /* 飞翼（车体下方） */
+      if(g.wingLv > 0){
+        const cx = dx+dw/2, wy = dy+dh*.46;
+        const spread = dw*(.62 + g.flyAlt*.55);
+        c.save();
+        c.translate(cx, wy);
+        c.rotate(g.tilt*.6);
+        c.globalAlpha = .38 + g.flyAlt*.62;
+        for(const s of [-1,1]){
+          const wg = c.createLinearGradient(s*spread, 0, 0, 0);
+          wg.addColorStop(0, 'rgba(247,183,49,.95)');
+          wg.addColorStop(1, 'rgba(255,255,255,.9)');
+          c.fillStyle = wg;
+          c.beginPath();
+          c.moveTo(0, -dh*.06);
+          c.lineTo(s*spread, dh*.16);
+          c.lineTo(s*spread*.72, dh*.3);
+          c.lineTo(0, dh*.12);
+          c.closePath();
+          c.fill();
+        }
+        if(g.flyAlt > .3){
+          c.globalAlpha = .5 + .3*Math.sin(g.frame*.3);
+          c.fillStyle = '#ffd60a';
+          c.beginPath(); c.arc(-spread, dh*.16, 2.4, 0, Math.PI*2); c.fill();
+          c.beginPath(); c.arc(spread, dh*.16, 2.4, 0, Math.PI*2); c.fill();
+        }
+        c.restore();
+        c.globalAlpha = 1;
+      }
+      drawCar(c, dx, dy, dw, dh, g.car, {tilt:g.tilt, flame:g.nitroActive});
     }
     /* 护盾气泡 */
     if(g.shield){
       c.strokeStyle = 'rgba(63,140,255,.75)';
       c.lineWidth = 2.5;
       c.beginPath();
-      c.ellipse(g.px+g.pw/2, g.py+g.ph/2, g.pw/2+9, g.ph/2+9, 0, 0, Math.PI*2);
+      c.ellipse(g.px+g.pw/2, g.py+g.ph/2-lift, g.pw/2+9, g.ph/2+9, 0, 0, Math.PI*2);
       c.stroke();
       c.strokeStyle = 'rgba(63,140,255,.3)';
       c.lineWidth = 7;
       c.beginPath();
-      c.ellipse(g.px+g.pw/2, g.py+g.ph/2, g.pw/2+13, g.ph/2+13, 0, 0, Math.PI*2);
+      c.ellipse(g.px+g.pw/2, g.py+g.ph/2-lift, g.pw/2+13, g.ph/2+13, 0, 0, Math.PI*2);
       c.stroke();
     }
     /* 磁铁范围 */
@@ -932,7 +1040,7 @@ const Game = {
       c.lineWidth = 2;
       c.setLineDash([6,7]);
       c.lineDashOffset = -g.frame*.5;
-      c.beginPath(); c.arc(g.px+g.pw/2, g.py+g.ph/2, mr, 0, Math.PI*2); c.stroke();
+      c.beginPath(); c.arc(g.px+g.pw/2, g.py+g.ph/2-lift, mr, 0, Math.PI*2); c.stroke();
       c.setLineDash([]);
     }
 
