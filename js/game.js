@@ -24,10 +24,7 @@ const Game = {
     const roadW = laneW*road.lanes;
     const pw = laneW*.52, ph = pw*1.7;
     const startNitroBuff = S.buffs.startNitro > 0;
-    if(startNitroBuff){ S.buffs.startNitro--; }
     const coinX2Buff = S.buffs.coinX2 > 0;
-    if(coinX2Buff){ S.buffs.coinX2--; }
-    save();
 
     this.g = {
       road, car, themeKey:road.theme, th:THEMES[road.theme],
@@ -49,25 +46,24 @@ const Game = {
       magnetTimer:0, shield:false, x2Timer:0, slowTimer:0, invincibleTimer:0,
       state:'countdown', countT:3.3, dieT:0, dieReason:'',
       shake:0, timeScale:1,
-      reviveUsed:false, coinX2Buff,
+      reviveUsed:false, coinX2Buff, startNitroBuff,
       dodgeCount:0, nearCount:0, ramCount:0, maxCombo:0,
       lowWarn25:false, lowWarn10:false,
       checkpointNext:500,
       touchTargetX:null, touching:false, moveLeft:false, moveRight:false, nitroHeld:false,
       frame:0,
+      hzSeed: (Math.random()*1e9)|0,
     };
     /* 初始 scenery */
     for(let y=-60; y<this.H+80; y+=rand(70,130)){
       this.spawnScenery(y);
     }
-    S.totalGames++;
-    feed('games', 1);
-    save();
     this.buildPuRow();
     this.updateHud(true);
     $('hudCombo').classList.remove('on');
     $('touchHint').classList.toggle('on', true);
-    setTimeout(()=>{ if(this.g) $('touchHint').classList.remove('on'); }, 3800);
+    const runRef = this.g;
+    setTimeout(()=>{ if(this.g === runRef) $('touchHint').classList.remove('on'); }, 3800);
     AudioSys.ensure();
     cancelAnimationFrame(this.raf);
     this.lastTs = performance.now();
@@ -77,6 +73,7 @@ const Game = {
       this.lastTs = ts;
       if(!this.paused){
         this.update(dtRaw);
+        if(!this.g) return;
         this.render();
       }
       this.raf = requestAnimationFrame(loop);
@@ -181,6 +178,11 @@ const Game = {
       if(!g.l3 && lit3){ g.l3=1; AudioSys.count(); }
       if(elapsed > 2.65 && g.state==='countdown'){
         g.state = 'run';
+        if(g.startNitroBuff) S.buffs.startNitro--;
+        if(g.coinX2Buff) S.buffs.coinX2--;
+        S.totalGames++;
+        feed('games', 1);
+        save();
         AudioSys.go();
         UI.banner('出发!');
         buzz(30);
@@ -323,16 +325,16 @@ const Game = {
       if(e.blink){
         e.blinkFrame += dt;
         if(e.changeDelay !== undefined){
-          e.changeDelay -= dt;
+          e.changeDelay -= dt*slow;
           if(e.changeDelay <= 0){
-            e.targetX = e.pendingX;
+            e.targetX = clamp(e.pendingX, g.roadX+2, g.roadX+g.roadW-e.w-2);
             e.changeDelay = undefined;
           }
         }
       }
       if(e.targetX !== undefined){
         const dx = e.targetX - e.x;
-        e.x += dx*e.lerpR*dt;
+        e.x += dx*e.lerpR*slow*dt;
         if(Math.abs(dx) < 2){ e.x = e.targetX; e.targetX = undefined; e.blink = 0; e.lane = e.targetLane; }
       }
     }
@@ -1025,6 +1027,8 @@ const Game = {
 
   drawHorizon(c, W, horY, th){
     const kind = th.horizon;
+    const rnd = srand(this.g ? this.g.hzSeed : 1);
+    const R = (a,b)=>a + rnd()*(b-a);
     c.fillStyle = th.hzA;
     if(kind==='hills' || kind==='dunes'){
       c.beginPath(); c.moveTo(0,horY);
@@ -1042,8 +1046,8 @@ const Game = {
       c.beginPath(); c.moveTo(0,horY);
       let x = 0;
       while(x < W){
-        const w = rand(90,150);
-        c.lineTo(x+w/2, horY-rand(34,62));
+        const w = R(90,150);
+        c.lineTo(x+w/2, horY-R(34,62));
         c.lineTo(x+w, horY-4);
         x += w;
       }
@@ -1059,7 +1063,7 @@ const Game = {
     } else if(kind==='city' || kind==='skyline'){
       let x = 0;
       while(x < W){
-        const w = rand(26,58), h = rand(18,58);
+        const w = R(26,58), h = R(18,58);
         c.fillStyle = th.hzA;
         c.fillRect(x, horY-h, w, h);
         if(th.windows){
@@ -1070,7 +1074,7 @@ const Game = {
             }
           }
         }
-        x += w + rand(4,14);
+        x += w + R(4,14);
       }
     }
   },
@@ -1170,10 +1174,25 @@ const Game = {
       g.roadX = (this.W - g.roadW)/2;
       g.py = this.H - g.ph - 128;
       g.px = clamp(g.px, g.roadX+4, g.roadX+g.roadW-g.pw-4);
+      /* 路面平移后把敌车吸回车道中心线，清除进行中的变道状态 */
+      for(const e of g.enemies){
+        e.x = g.roadX + e.lane*g.laneW + (g.laneW-e.w)/2;
+        e.targetX = undefined; e.pendingX = undefined; e.changeDelay = undefined; e.blink = 0;
+      }
     }
   },
 };
 
 function rectOverlap(x1,y1,w1,h1,x2,y2,w2,h2){
   return x1 < x2+w2 && x1+w1 > x2 && y1 < y2+h2 && y1+h1 > y2;
+}
+/* 种子随机数（mulberry32）：同一种子产生同一序列，用于稳定的地平线轮廓 */
+function srand(seed){
+  let a = seed>>>0;
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a>>>15, 1 | a);
+    t = t + Math.imul(t ^ t>>>7, 61 | t) ^ t;
+    return ((t ^ t>>>14)>>>0)/4294967296;
+  };
 }

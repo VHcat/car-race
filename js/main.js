@@ -19,6 +19,11 @@ document.addEventListener('keyup', e=>{
   if(e.key==='ArrowRight' || e.key==='d' || e.key==='D') g.moveRight = false;
   if(e.key===' ' || e.key==='ArrowUp' || e.key==='w' || e.key==='W') g.nitroHeld = false;
 });
+/* 窗口失焦时按键可能收不到 keyup，清掉所有输入状态避免自动转向 */
+window.addEventListener('blur', ()=>{
+  const g = Game.g;
+  if(g){ g.moveLeft = false; g.moveRight = false; g.nitroHeld = false; }
+});
 
 /* ---- 触屏 / 鼠标转向（位置跟随） ---- */
 const gameCanvas = $('gameCanvas');
@@ -36,6 +41,14 @@ gameCanvas.addEventListener('touchmove', e=>{
   g.touchTargetX = e.touches[0].clientX;
 }, {passive:false});
 gameCanvas.addEventListener('touchend', e=>{
+  e.preventDefault();
+  const g = Game.g;
+  if(!g) return;
+  g.touching = false;
+  g.touchTargetX = null;
+}, {passive:false});
+/* 系统手势（来电等）触发 touchcancel，同样要结束跟随，否则车辆一直漂移 */
+gameCanvas.addEventListener('touchcancel', e=>{
   e.preventDefault();
   const g = Game.g;
   if(!g) return;
@@ -73,7 +86,7 @@ nitroBtn.addEventListener('pointerdown', e=>{
 nitroBtn.addEventListener('contextmenu', e=>e.preventDefault());
 
 /* ---- 暂停按钮 ---- */
-$('pauseBtn').addEventListener('click', ()=>Game.togglePause());
+$('pauseBtn').addEventListener('click', e=>{ Game.togglePause(); e.currentTarget.blur(); });
 
 /* ---- 尺寸 ---- */
 function onResize(){

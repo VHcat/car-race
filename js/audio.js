@@ -17,6 +17,7 @@ const AudioSys = {
       this.engOsc2 = this.ctx.createOscillator(); this.engOsc2.type='sawtooth'; this.engOsc2.frequency.value=48; this.engOsc2.detune.value=9;
       this.engOsc.connect(this.engFilter); this.engOsc2.connect(this.engFilter); this.engFilter.connect(this.engG);
       this.engOsc.start(); this.engOsc2.start();
+      if(this.ctx.state==='suspended') this.ctx.resume();
     }catch(e){ this.ctx=null; return false; }
     return true;
   },

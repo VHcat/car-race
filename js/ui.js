@@ -96,18 +96,19 @@ const UI = {
   },
   grantXp(amount){
     S.xp += amount;
-    let ups = 0;
+    let ups = 0, totalBonus = 0;
     while(S.xp >= xpNeed(S.level)){
       S.xp -= xpNeed(S.level);
       S.level++;
       ups++;
       const bonus = 80 * S.level;
       S.coins += bonus;
+      totalBonus += bonus;
       if(S.level % 3 === 0) S.gems += 5;
     }
     if(ups > 0){
       AudioSys.levelup();
-      this.toast(`🎉 升级！LV.${S.level} · ${levelTitle(S.level)}  奖励 🪙${80*S.level}`);
+      this.toast(`🎉 升级！LV.${S.level} · ${levelTitle(S.level)}  奖励 🪙${totalBonus}`);
     }
     return ups;
   },
@@ -471,7 +472,9 @@ const Bank = {
           clearInterval(spinIv);
           apply();
           const won = rewardText.includes('+') || rewardText.includes('中奖');
+          const breakEven = rewardText.includes('保本');
           if(won){ reels.forEach(x=>x.classList.add('win')); AudioSys.win(); buzz([30,50,30,50,80]); }
+          else if(breakEven){ AudioSys.click(); }
           else AudioSys.lose();
           $('bankResult').textContent = rewardText;
           save();

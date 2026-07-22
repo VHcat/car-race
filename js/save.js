@@ -28,7 +28,16 @@ function loadSave(){
   if(!Array.isArray(S.ownedCars) || !S.ownedCars.length) S.ownedCars=[0];
   if(!S.ownedCars.includes(S.selectedCar)) S.selectedCar = S.ownedCars[0];
 }
-function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
+let saveWarned = false;
+function save(){
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }
+  catch(e){
+    if(!saveWarned){
+      saveWarned = true;
+      if(typeof UI !== 'undefined' && UI.toast) UI.toast('⚠️ 存档写入失败，进度可能无法保存！');
+    }
+  }
+}
 
 /* ================= STATS / EVENTS ================= */
 function ensureDaily(){
