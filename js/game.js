@@ -368,7 +368,7 @@ const Game = {
         if(nl>=0 && nl<g.laneCount && nl!==cur){
           const tx = g.roadX + nl*g.laneW + (g.laneW-e.w)/2 + rand(-8,8);
           const blocked = g.enemies.some(o=>o!==e && Math.abs(o.x-tx)<e.w && Math.abs(o.y-e.y)<e.h+90);
-          if(!blocked){ e.dir = nl>cur?1:-1; e.blink = 1; e.blinkFrame = 0; e.changeDelay = 42; e.targetLane = nl; e.pendingX = tx; }
+          if(!blocked){ e.dir = nl>cur?1:-1; e.blink = 1; e.blinkFrame = 0; e.changeDelay = 50; e.targetLane = nl; e.pendingX = tx; }
         }
       }
       if(e.blink){
@@ -377,14 +377,18 @@ const Game = {
           e.changeDelay -= dt*slow;
           if(e.changeDelay <= 0){
             e.targetX = clamp(e.pendingX, g.roadX+2, g.roadX+g.roadW-e.w-2);
+            e.startX = e.x; e.changeT = 0;
             e.changeDelay = undefined;
           }
         }
       }
       if(e.targetX !== undefined){
-        const dx = e.targetX - e.x;
-        e.x += dx*e.lerpR*slow*dt;
-        if(Math.abs(dx) < 2){ e.x = e.targetX; e.targetX = undefined; e.blink = 0; e.lane = e.targetLane; }
+        /* 定时 S 曲线漂移：缓起缓收，给玩家反应时间 */
+        e.changeT += dt*slow;
+        const p = Math.min(1, e.changeT / e.changeDur);
+        const s = p*p*(3-2*p);
+        e.x = e.startX + (e.targetX - e.startX)*s;
+        if(p >= 1){ e.x = e.targetX; e.targetX = undefined; e.blink = 0; e.lane = e.targetLane; }
       }
     }
     /* 通过判定 + 险胜 */
@@ -578,7 +582,7 @@ const Game = {
       type: type.name,
       changer: !!type.changer && difficulty > 1.2,
       changeRate: type.changer ? .012 : (big ? .0025 : .005),
-      lerpR: big ? .055 : (type.changer ? .11 : .085),
+      changeDur: big ? 70 : (type.changer ? 45 : 60),
       passed:false, nearDone:false, blink:0, blinkFrame:0, targetX:undefined, dir:0,
     });
   },
