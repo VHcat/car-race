@@ -28,6 +28,7 @@ const Game = {
     /* 改装零件（仅已装备的生效） */
     const wingLv = partLv('wing'), armorLv = partLv('armor'), tankLv = partLv('fueltank');
     const magLv = partLv('magnetp'), chipLv = partLv('coinchip'), turboLv = partLv('turbo'), recLv = partLv('nitrorec');
+    const wingOwned = (S.parts.wing||0) > 0;
     const fuelCap = 100 + tankLv*12;
 
     this.g = {
@@ -51,7 +52,7 @@ const Game = {
       magnetTimer: magLv ? (4+magLv*2)*60 : 0, shield:false, x2Timer:0, slowTimer:0, invincibleTimer:0,
       coinChip: 1 + chipLv*.1,
       armorHits: armorLv ? 1+Math.floor((armorLv-1)/2) : 0,
-      wingLv, flyEnergy:100, flying:false, flyAlt:0, flyHeld:false, flyDur:(2+wingLv*.6)*60,
+      wingLv, wingOwned, flyEnergy:100, flying:false, flyAlt:0, flyHeld:false, flyDur:(2+wingLv*.6)*60,
       state:'countdown', countT:3.3, dieT:0, dieReason:'',
       shake:0, timeScale:1,
       reviveUsed:false, coinX2Buff, startNitroBuff,
@@ -69,11 +70,14 @@ const Game = {
     this.buildPuRow();
     this.updateHud(true);
     $('hudCombo').classList.remove('on');
-    $('flyBtn').hidden = wingLv <= 0;
+    $('flyBtn').hidden = false;
     $('flyBtn').classList.remove('flying');
+    $('flyBtn').classList.toggle('locked', !wingOwned);
     $('touchHint').textContent = wingLv > 0
       ? '👆 左右拖动转向 · 长按 NOS 氮气 · 长按 FLY 飞越来车'
-      : '👆 左右拖动控制方向 · 长按 NOS 氮气加速';
+      : wingOwned
+        ? '👆 左右拖动转向 · 长按 NOS 氮气 · FLY 需先装备飞翼'
+        : '👆 左右拖动控制方向 · 长按 NOS 氮气加速';
     $('touchHint').classList.toggle('on', true);
     const runRef = this.g;
     setTimeout(()=>{ if(this.g === runRef) $('touchHint').classList.remove('on'); }, 3800);
@@ -802,7 +806,7 @@ const Game = {
     $('fuelFill').style.width = (g.fuel/g.fuelCap*100) + '%';
     $('fuelNum').textContent = Math.ceil(g.fuel);
     $('nitroBtn').style.setProperty('--n', g.nitro);
-    if(g.wingLv > 0){
+    if(g.wingOwned){
       const fb = $('flyBtn');
       fb.style.setProperty('--fe', g.flyEnergy);
       fb.classList.toggle('flying', g.flying);

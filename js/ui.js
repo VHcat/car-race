@@ -446,7 +446,7 @@ const Mod = {
         ${equipped ? '<span class="mc-tag eq">已装备</span>' : p.type==='active' ? '<span class="mc-tag">主动装置</span>' : ''}
         <div class="sc-ico">${p.emoji}</div>
         <div class="sc-name">${p.name}</div>
-        <div class="sc-desc">${p.desc}</div>
+        <div class="sc-desc">${p.desc}${p.id==='wing' && owned ? '<br>（比赛中长按右侧 FLY 键飞行）' : ''}</div>
         <div class="mc-lv"><span class="mod-pips">${pips}</span>Lv.${lv}/${p.maxLv}</div>
         <div class="mc-eff">${owned ? p.lvDesc(lv) : 'Lv.1 效果：' + p.lvDesc(1)}</div>
         <div class="mc-btns">${btns}</div>`;

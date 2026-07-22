@@ -218,6 +218,8 @@ b,strong{font-weight:700}
 .fly-btn.flying{box-shadow:0 0 18px rgba(247,183,49,.75)}
 .fly-btn.flying span{color:#fff;animation:flyPulse .5s infinite}
 .fly-btn.empty span{opacity:.35}
+.fly-btn.locked{background:rgba(255,255,255,.13);opacity:.55}
+.fly-btn.locked span{color:#8a8f98;text-shadow:none}
 @keyframes flyPulse{50%{text-shadow:0 0 16px rgba(255,230,150,1)}}
 .pu-row{display:flex;gap:7px;flex:1;justify-content:center;pointer-events:auto;flex-wrap:nowrap}
 .pu-btn{position:relative;width:46px;height:46px;border-radius:9px;border:2px solid rgba(255,255,255,.28);

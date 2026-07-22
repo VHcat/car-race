@@ -92,7 +92,10 @@ const flyBtn = $('flyBtn');
 flyBtn.addEventListener('pointerdown', e=>{
   e.preventDefault();
   const g = Game.g;
-  if(g && g.state==='run') g.flyHeld = true;
+  if(!g || g.state!=='run') return;
+  if(g.wingLv > 0) g.flyHeld = true;
+  else if(g.wingOwned) UI.toast('🪽 飞翼还没装备，去改装车间装配一下！');
+  else UI.toast('🪽 飞翼装置可在改装车间购买（💎18）');
 });
 ['pointerup','pointerleave','pointercancel'].forEach(ev=>{
   flyBtn.addEventListener(ev, ()=>{
