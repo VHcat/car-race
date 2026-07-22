@@ -303,15 +303,21 @@ const Game = {
     const slow = g.slowTimer>0 ? .35 : 1;
     for(const e of g.enemies){
       e.y += (g.pSpeed - e.speed)*slow*dt;
-      if(e.changer && !e.targetX && e.y > this.H*.1 && e.y < this.H*.42 && Math.random() < .012*dt){
+      /* 变道决策：跑车追猎玩家车道，其余车辆随机缓变道 */
+      if(e.targetX===undefined && e.changeDelay===undefined && e.y > this.H*.08 && e.y < this.H*.46 && Math.random() < e.changeRate*dt){
         const cur = e.lane;
-        const pLane = Math.floor((g.px + g.pw/2 - g.roadX)/g.laneW);
-        let nl = cur + (pLane > cur ? 1 : pLane < cur ? -1 : (Math.random()<.5?-1:1));
+        let nl;
+        if(e.changer){
+          const pLane = Math.floor((g.px + g.pw/2 - g.roadX)/g.laneW);
+          nl = cur + (pLane > cur ? 1 : pLane < cur ? -1 : (Math.random()<.5?-1:1));
+        } else {
+          nl = cur + (Math.random()<.5?-1:1);
+        }
         if(nl<0) nl = cur+1; if(nl>=g.laneCount) nl = cur-1;
         if(nl>=0 && nl<g.laneCount && nl!==cur){
-          const tx = g.roadX + nl*g.laneW + (g.laneW-e.w)/2;
+          const tx = g.roadX + nl*g.laneW + (g.laneW-e.w)/2 + rand(-8,8);
           const blocked = g.enemies.some(o=>o!==e && Math.abs(o.x-tx)<e.w && Math.abs(o.y-e.y)<e.h+90);
-          if(!blocked){ e.dir = nl>cur?1:-1; e.blink = 1; e.blinkFrame = 0; e.changeDelay = 42; e.targetLane = nl; }
+          if(!blocked){ e.dir = nl>cur?1:-1; e.blink = 1; e.blinkFrame = 0; e.changeDelay = 42; e.targetLane = nl; e.pendingX = tx; }
         }
       }
       if(e.blink){
@@ -319,14 +325,14 @@ const Game = {
         if(e.changeDelay !== undefined){
           e.changeDelay -= dt;
           if(e.changeDelay <= 0){
-            e.targetX = g.roadX + e.targetLane*g.laneW + (g.laneW-e.w)/2;
+            e.targetX = e.pendingX;
             e.changeDelay = undefined;
           }
         }
       }
       if(e.targetX !== undefined){
         const dx = e.targetX - e.x;
-        e.x += dx*.09*dt;
+        e.x += dx*e.lerpR*dt;
         if(Math.abs(dx) < 2){ e.x = e.targetX; e.targetX = undefined; e.blink = 0; e.lane = e.targetLane; }
       }
     }
@@ -471,28 +477,46 @@ const Game = {
   /* ---------- 生成 ---------- */
   spawnEnemy(difficulty){
     const g = this.g;
-    /* 可解性：至少保留一条空车道 */
+    /* 可解性：按实际矩形覆盖计算被占车道，至少保留一条空车道 */
     const blocked = new Set();
-    for(const e of g.enemies) if(e.y < this.H*.42) blocked.add(e.lane);
+    for(const e of g.enemies){
+      if(e.y < this.H*.42){
+        const l0 = Math.max(0, Math.floor((e.x - g.roadX)/g.laneW));
+        const l1 = Math.min(g.laneCount-1, Math.floor((e.x + e.w - 1 - g.roadX)/g.laneW));
+        for(let l=l0; l<=l1; l++) blocked.add(l);
+      }
+    }
     if(blocked.size >= g.laneCount-1) return;
     const free = [];
-    for(let l=0;l<g.laneCount;l++) if(!blocked.has(l)) free.push(l);
+    for(let l=0; l<g.laneCount; l++) if(!blocked.has(l)) free.push(l);
     const lane = pick(free);
-    /* 车道顶部清空 */
-    const laneBusy = g.enemies.some(e=>e.lane===lane && e.y < 140);
-    if(laneBusy) return;
     /* 加权选车型 */
     const pool = [];
     ENEMY_TYPES.forEach(t=>{ for(let i=0;i<t.weight;i++) pool.push(t); });
     const type = pick(pool);
-    const w = type.w, h = type.h;
-    const x = g.roadX + lane*g.laneW + (g.laneW-w)/2;
+    const w = type.w, h = type.h, y = -h-24;
+    const cx = g.roadX + lane*g.laneW + (g.laneW-w)/2;
+    /* 横向位置：车道内随机偏移，约 1/3 概率直接压线生成，覆盖所有可选位置 */
+    const maxOff = Math.max(4, (g.laneW-w)/2 - 2) * .7;
+    let x = cx + rand(-maxOff, maxOff);
+    if(Math.random() < .35){
+      const side = Math.random()<.5 ? -1 : 1;
+      const nl = lane + side;
+      if(nl>=0 && nl<g.laneCount && !blocked.has(nl)){
+        x = g.roadX + (side>0 ? (lane+1)*g.laneW : lane*g.laneW) - w/2 + rand(-5,5);
+      }
+    }
+    /* 顶部清空（按实际矩形判定，避免压线车互相重叠） */
+    if(g.enemies.some(o=>o.y < 130 && rectOverlap(x, y, w, h, o.x, o.y, o.w, o.h))) return;
+    const big = type.name==='truck' || type.name==='bus';
     g.enemies.push({
-      x, y:-h-24, w, h, lane,
+      x, y, w, h, lane,
       speed: rand(type.sp[0], type.sp[1]) + (difficulty-1)*.25,
       color: pick(ENEMY_COLORS),
       type: type.name,
-      changer: !!type.changer && difficulty > 1.3,
+      changer: !!type.changer && difficulty > 1.2,
+      changeRate: type.changer ? .012 : (big ? .0025 : .005),
+      lerpR: big ? .055 : (type.changer ? .11 : .085),
       passed:false, nearDone:false, blink:0, blinkFrame:0, targetX:undefined, dir:0,
     });
   },
