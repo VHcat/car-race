@@ -42,7 +42,7 @@ const Game = {
       nitroPower: 1.45 + eff('nitro')*.05,
       nitroDrain: Math.max(13, 30 - eff('nitro')*1.1)/60,
       nitroRegen: recLv*1.2/60,
-      fuel:fuelCap, fuelCap, fuelDrain: .017 + road.traffic*.004,
+      fuel:fuelCap, fuelCap, fuelDrain: .028 + road.traffic*.006,
       distance:0, dashScroll:0, coins:0, bonusScore:0, score:0,
       combo:0, comboTimer:0,
       nitro: startNitroBuff ? 100 : 30, nitroActive:false,
@@ -58,7 +58,7 @@ const Game = {
       reviveUsed:false, coinX2Buff, startNitroBuff,
       dodgeCount:0, nearCount:0, ramCount:0, maxCombo:0,
       lowWarn25:false, lowWarn10:false,
-      checkpointNext:500,
+      checkpointNext:500, breatherNext:1000, breatherT:0,
       touchTargetX:null, touching:false, moveLeft:false, moveRight:false, nitroHeld:false,
       frame:0,
       hzSeed: (Math.random()*1e9)|0,
@@ -167,7 +167,7 @@ const Game = {
     switch(id){
       case 'magnet': g.magnetTimer = 15*60; UI.toast('🧲 磁铁激活！'); AudioSys.pickup(); break;
       case 'shield': g.shield = true; UI.toast('🛡️ 保护盾就绪！'); AudioSys.shield(); break;
-      case 'fuel': g.fuel = Math.min(g.fuelCap, g.fuel+35); UI.toast('⛽ 油量 +35%'); AudioSys.fuelUp(); break;
+      case 'fuel': g.fuel = Math.min(g.fuelCap, g.fuel+25); UI.toast('⛽ 油量 +25'); AudioSys.fuelUp(); break;
       case 'thunder':
         g.enemies.forEach(e=>{ this.explode(e.x+e.w/2, e.y+e.h/2); g.coins++; g.bonusScore+=10; });
         if(g.enemies.length) feed('coins', g.enemies.length);
@@ -323,7 +323,7 @@ const Game = {
     g.score = Math.floor(g.distance*.1 + g.bonusScore);
     if(g.distance >= g.checkpointNext){
       g.checkpointNext += 500;
-      g.fuel = Math.min(g.fuelCap, g.fuel + 10);
+      g.fuel = Math.min(g.fuelCap, g.fuel + 6);
       const bonus = Math.round(15*g.road.coinMul);
       g.coins += bonus;
       feed('coins', bonus);
@@ -332,14 +332,25 @@ const Game = {
       this.addFloat(g.px+g.pw/2, g.py-30, `+${bonus} 🪙`, '#f7b731', 20);
       buzz(25);
     }
+    /* ---- 呼吸波：每 1000m 暂停刷车 3 秒 + 金币雨 ---- */
+    if(g.breatherT > 0){
+      g.breatherT -= dt;
+    } else if(g.distance >= g.breatherNext){
+      g.breatherNext += 1000;
+      g.breatherT = 180;
+      UI.banner('🌊 安全路段');
+      for(let i=0;i<6;i++) g.coinsArr.push({x: g.roadX + rand(24, g.roadW-24), y:-20-i*42, size:15, angle:rand(0,6), got:false});
+    }
 
-    /* ---- 生成敌车 ---- */
-    g.enemyTimer += dt;
-    const spawnInt = Math.max(15, 62 - g.road.traffic*18 - (difficulty-1)*9);
-    if(g.enemyTimer >= spawnInt){
-      g.enemyTimer = 0;
-      this.spawnEnemy(difficulty);
-      if(difficulty > 1.6 && Math.random() < .3) this.spawnEnemy(difficulty);
+    /* ---- 生成敌车（呼吸波期间暂停） ---- */
+    if(g.breatherT <= 0){
+      g.enemyTimer += dt;
+      const spawnInt = Math.max(15, 62 - g.road.traffic*18 - (difficulty-1)*9);
+      if(g.enemyTimer >= spawnInt){
+        g.enemyTimer = 0;
+        this.spawnEnemy(difficulty);
+        if(difficulty > 1.6 && Math.random() < .3) this.spawnEnemy(difficulty);
+      }
     }
     /* ---- 生成金币 ---- */
     g.coinTimer += dt;
@@ -586,7 +597,7 @@ const Game = {
       speed: rand(type.sp[0], type.sp[1]) + (difficulty-1)*.25,
       color: pick(ENEMY_COLORS),
       type: type.name,
-      changer: !!type.changer && difficulty > 1.2,
+      changer: !!type.changer && difficulty > 2.0,
       changeRate: type.changer ? .012 : (big ? .0025 : .005),
       changeDur: big ? 70 : (type.changer ? 45 : 60),
       passed:false, nearDone:false, blink:0, blinkFrame:0, targetX:undefined, dir:0,
@@ -698,12 +709,15 @@ const Game = {
     }
     AudioSys.setEngine(0, false);
   },
+  reviveCost(){ return Math.max(50, Math.min(300, Math.floor(this.g.distance/10))); },
   tryReviveOrFinish(){
     const g = this.g;
     g.timeScale = 1;
-    if(!g.reviveUsed && (S.coins >= 150 || S.gems >= 5)){
+    const cost = this.reviveCost();
+    if(!g.reviveUsed && (S.coins >= cost || S.gems >= 5)){
       g.state = 'revive';
-      $('rvCoinBtn').disabled = S.coins < 150;
+      $('rvCoinBtn').disabled = S.coins < cost;
+      $('rvCoinBtn').querySelector('span').textContent = `🪙 ${cost} 复活`;
       $('rvGemBtn').disabled = S.gems < 5;
       const bar = $('rvTimerBar');
       bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = '';
@@ -716,7 +730,8 @@ const Game = {
   revive(mode){
     const g = this.g;
     if(!g || g.state!=='revive') return;
-    if(mode==='coins'){ if(S.coins < 150) return; S.coins -= 150; }
+    const cost = this.reviveCost();
+    if(mode==='coins'){ if(S.coins < cost) return; S.coins -= cost; }
     else { if(S.gems < 5) return; S.gems -= 5; }
     clearTimeout(this.reviveTimeout);
     g.reviveUsed = true;
@@ -748,6 +763,8 @@ const Game = {
     S.totalDodge += g.dodgeCount;
     S.totalNear += g.nearCount;
     S.totalRam += g.ramCount;
+    const completionBonus = Math.floor(20 + dist/50);
+    g.coins += completionBonus;
     S.coins += g.coins;
     feed('dist', dist);
     let record = false;

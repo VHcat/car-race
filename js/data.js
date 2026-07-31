@@ -73,7 +73,7 @@ const ENEMY_COLORS = ['#3f8cff','#ff7b1c','#2a9d3f','#8f2fd4','#1fb6c9','#e5383b
 const SHOP_ITEMS = [
   {id:'magnet', name:'磁铁',   emoji:'🧲', desc:'15秒内自动吸附附近金币',       price:100},
   {id:'shield', name:'保护盾', emoji:'🛡️', desc:'抵挡一次碰撞',                 price:150},
-  {id:'fuel',   name:'备用油箱',emoji:'⛽', desc:'立即补充35%油量',              price:80},
+  {id:'fuel',   name:'备用油箱',emoji:'⛽', desc:'立即补充25点油量',              price:80},
   {id:'thunder',name:'雷霆',   emoji:'⚡', desc:'清除屏幕上所有来车',           price:200},
   {id:'x2coin', name:'双倍金币',emoji:'💰', desc:'30秒内金币收益翻倍',           price:250},
   {id:'slowmo', name:'时间减缓',emoji:'⏳', desc:'8秒内来车大幅减速',            price:180},
