@@ -73,6 +73,7 @@ const Game = {
     $('flyBtn').hidden = false;
     $('flyBtn').classList.remove('flying');
     $('flyBtn').classList.toggle('locked', !wingOwned);
+    $('flyBtn').classList.toggle('attn', wingLv > 0);
     $('touchHint').textContent = wingLv > 0
       ? '👆 左右拖动转向 · 长按 NOS 氮气 · 长按 FLY 飞越来车'
       : wingOwned
@@ -80,7 +81,7 @@ const Game = {
         : '👆 左右拖动控制方向 · 长按 NOS 氮气加速';
     $('touchHint').classList.toggle('on', true);
     const runRef = this.g;
-    setTimeout(()=>{ if(this.g === runRef) $('touchHint').classList.remove('on'); }, 3800);
+    setTimeout(()=>{ if(this.g === runRef) $('touchHint').classList.remove('on'); }, wingLv > 0 ? 5200 : 3800);
     AudioSys.ensure();
     cancelAnimationFrame(this.raf);
     this.lastTs = performance.now();
@@ -253,6 +254,7 @@ const Game = {
     if(g.wingLv > 0){
       if(g.flyHeld && !g.flying && g.flyEnergy >= 15){
         g.flying = true;
+        $('flyBtn').classList.remove('attn');
         AudioSys.takeoff();
         this.addFloat(g.px+g.pw/2, g.py-18, '起飞!', '#f7b731', 15);
         buzz(20);
@@ -1280,7 +1282,7 @@ const Game = {
     this.W = vv ? vv.width : innerWidth;
     this.H = vv ? vv.height : innerHeight;
     this.dpr = Math.min(devicePixelRatio||1, 2);
-    if(this.cv){
+    if(this.cv && this.ctx){
       this.cv.width = this.W*this.dpr;
       this.cv.height = this.H*this.dpr;
       this.ctx.setTransform(this.dpr,0,0,this.dpr,0,0);

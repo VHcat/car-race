@@ -209,20 +209,22 @@ b,strong{font-weight:700}
 .nitro-btn.firing{animation:nitroShake .12s infinite}
 .nitro-btn.firing span{color:#fff}
 @keyframes nitroShake{25%{transform:translate(-1px,1px)}75%{transform:translate(1px,-1px)}}
-.fly-btn{position:relative;pointer-events:auto;width:54px;height:54px;border-radius:50%;cursor:pointer;
+.fly-btn{position:relative;pointer-events:auto;width:66px;height:66px;border-radius:50%;cursor:pointer;
   border:0;background:conic-gradient(var(--gold) calc(var(--fe,100)*1%),rgba(255,255,255,.13) 0);
   display:flex;align-items:center;justify-content:center;flex:0 0 auto;transition:box-shadow .2s}
-.fly-btn::before{content:'';position:absolute;inset:4px;border-radius:50%;background:#10151d}
-.fly-btn span{position:relative;font-family:var(--fd);font-size:12px;color:var(--gold);letter-spacing:1px;
+.fly-btn::before{content:'';position:absolute;inset:5px;border-radius:50%;background:#10151d}
+.fly-btn span{position:relative;font-family:var(--fd);font-size:15px;color:var(--gold);letter-spacing:1px;
   text-shadow:0 0 10px rgba(247,183,49,.8)}
 .fly-btn.flying{box-shadow:0 0 18px rgba(247,183,49,.75)}
 .fly-btn.flying span{color:#fff;animation:flyPulse .5s infinite}
 .fly-btn.empty span{opacity:.35}
 .fly-btn.locked{background:rgba(255,255,255,.13);opacity:.55}
 .fly-btn.locked span{color:#8a8f98;text-shadow:none}
+.fly-btn.attn{animation:flyAttn 1.1s ease-in-out infinite}
+@keyframes flyAttn{0%,100%{box-shadow:0 0 0 0 rgba(247,183,49,0)}50%{box-shadow:0 0 22px 5px rgba(247,183,49,.6)}}
 @keyframes flyPulse{50%{text-shadow:0 0 16px rgba(255,230,150,1)}}
-.pu-row{display:flex;gap:7px;flex:1;justify-content:center;pointer-events:auto;flex-wrap:nowrap}
-.pu-btn{position:relative;width:46px;height:46px;border-radius:9px;border:2px solid rgba(255,255,255,.28);
+.pu-row{display:flex;gap:6px;flex:1;min-width:0;justify-content:center;pointer-events:auto;flex-wrap:nowrap}
+.pu-btn{position:relative;width:46px;height:46px;flex:0 1 46px;min-width:0;border-radius:9px;border:2px solid rgba(255,255,255,.28);
   cursor:pointer;font-size:21px;display:flex;align-items:center;justify-content:center;
   background:rgba(8,10,14,.66);transition:transform .1s,border-color .2s,box-shadow .2s}
 .pu-btn:active{transform:scale(.9)}
@@ -454,9 +456,9 @@ b,strong{font-weight:700}
 @keyframes confFall{to{transform:translateY(105vh) rotate(720deg);opacity:.6}}
 
 @media (max-width:360px){
-  .pu-btn{width:41px;height:41px;font-size:18px}
+  .pu-btn{width:42px;height:42px;flex-basis:42px;font-size:18px}
   .nitro-btn{width:58px;height:58px}
-  .fly-btn{width:48px;height:48px}
+  .fly-btn{width:58px;height:58px}
   .pit-btn{padding:9px 10px}
 }
 @media (max-height:620px){
