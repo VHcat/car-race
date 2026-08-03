@@ -58,7 +58,7 @@ const Game = {
       reviveUsed:false, coinX2Buff, startNitroBuff,
       dodgeCount:0, nearCount:0, ramCount:0, maxCombo:0,
       lowWarn25:false, lowWarn10:false,
-      checkpointNext:500,
+      checkpointNext:500, coinRushNext:1000,
       touchTargetX:null, touching:false, moveLeft:false, moveRight:false, nitroHeld:false,
       frame:0,
       hzSeed: (Math.random()*1e9)|0,
@@ -220,7 +220,7 @@ const Game = {
     if(g.state==='revive') return;
 
     /* ---- 难度与速度 ---- */
-    const difficulty = Math.min(3.2, 1 + g.distance/2500);
+    const difficulty = Math.min(3.2, 1 + Math.pow(g.distance/2500, 1.3));
     let target = g.maxSpeed * Math.min(difficulty, 2.2);
     /* 氮气 */
     if(g.nitroHeld && g.nitro > 0){
@@ -331,6 +331,11 @@ const Game = {
       UI.banner(`检查站 +⛽ +🪙${bonus}`);
       this.addFloat(g.px+g.pw/2, g.py-30, `+${bonus} 🪙`, '#f7b731', 20);
       buzz(25);
+    }
+    /* ---- 金币潮：每 1000m 额外刷一波金币 ---- */
+    if(g.distance >= g.coinRushNext){
+      g.coinRushNext += 1000;
+      for(let i=0;i<8;i++) g.coinsArr.push({x: g.roadX + rand(24, g.roadW-24), y:-20-i*38, size:15, angle:rand(0,6), got:false});
     }
 
     /* ---- 生成敌车 ---- */
@@ -769,6 +774,7 @@ const Game = {
     $('goBest').textContent = fmt(S.bestDistance) + ' m';
     $('goRecord').classList.toggle('on', record);
     $('goXp').textContent = `+${fmt(xp)} 经验` + (ups>0 ? ` · 升级至 LV.${S.level}！` : ` · LV.${S.level} ${levelTitle(S.level)}`);
+    $('goBonus').textContent = `+${completionBonus}`;
     this.countUp($('goDist'), dist, ' m');
     this.countUp($('goCoins'), g.coins, '');
     this.countUp($('goScore'), g.score, '');
