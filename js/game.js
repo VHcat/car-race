@@ -58,7 +58,7 @@ const Game = {
       reviveUsed:false, coinX2Buff, startNitroBuff,
       dodgeCount:0, nearCount:0, ramCount:0, maxCombo:0,
       lowWarn25:false, lowWarn10:false,
-      checkpointNext:500, breatherNext:1000, breatherT:0,
+      checkpointNext:500,
       touchTargetX:null, touching:false, moveLeft:false, moveRight:false, nitroHeld:false,
       frame:0,
       hzSeed: (Math.random()*1e9)|0,
@@ -244,7 +244,7 @@ const Game = {
     $('nitroBtn').style.setProperty('--n', g.nitro);
 
     /* ---- 油量 ---- */
-    g.fuel -= g.fuelDrain * (g.pSpeed/g.maxSpeed) * dt * (g.nitroActive?1.25:1);
+    g.fuel -= g.fuelDrain * (g.pSpeed/g.maxSpeed) * dt * (g.nitroActive?1.8:1);
     if(g.fuel <= 25 && !g.lowWarn25){ g.lowWarn25=true; AudioSys.lowFuel(); UI.toast('⛽ 油量不足，注意检查站补给！'); }
     if(g.fuel <= 10 && !g.lowWarn10){ g.lowWarn10=true; AudioSys.lowFuel(); buzz(60); }
     $('fuelTrack').classList.toggle('low', g.fuel<=25);
@@ -323,7 +323,7 @@ const Game = {
     g.score = Math.floor(g.distance*.1 + g.bonusScore);
     if(g.distance >= g.checkpointNext){
       g.checkpointNext += 500;
-      g.fuel = Math.min(g.fuelCap, g.fuel + 6);
+      g.fuel = Math.min(g.fuelCap, g.fuel + 5);
       const bonus = Math.round(15*g.road.coinMul);
       g.coins += bonus;
       feed('coins', bonus);
@@ -332,25 +332,14 @@ const Game = {
       this.addFloat(g.px+g.pw/2, g.py-30, `+${bonus} 🪙`, '#f7b731', 20);
       buzz(25);
     }
-    /* ---- 呼吸波：每 1000m 暂停刷车 3 秒 + 金币雨 ---- */
-    if(g.breatherT > 0){
-      g.breatherT -= dt;
-    } else if(g.distance >= g.breatherNext){
-      g.breatherNext += 1000;
-      g.breatherT = 180;
-      UI.banner('🌊 安全路段');
-      for(let i=0;i<6;i++) g.coinsArr.push({x: g.roadX + rand(24, g.roadW-24), y:-20-i*42, size:15, angle:rand(0,6), got:false});
-    }
 
-    /* ---- 生成敌车（呼吸波期间暂停） ---- */
-    if(g.breatherT <= 0){
-      g.enemyTimer += dt;
-      const spawnInt = Math.max(15, 62 - g.road.traffic*18 - (difficulty-1)*9);
-      if(g.enemyTimer >= spawnInt){
-        g.enemyTimer = 0;
-        this.spawnEnemy(difficulty);
-        if(difficulty > 1.6 && Math.random() < .3) this.spawnEnemy(difficulty);
-      }
+    /* ---- 生成敌车 ---- */
+    g.enemyTimer += dt;
+    const spawnInt = Math.max(15, 62 - g.road.traffic*18 - (difficulty-1)*9);
+    if(g.enemyTimer >= spawnInt){
+      g.enemyTimer = 0;
+      this.spawnEnemy(difficulty);
+      if(difficulty > 1.6 && Math.random() < .3) this.spawnEnemy(difficulty);
     }
     /* ---- 生成金币 ---- */
     g.coinTimer += dt;
