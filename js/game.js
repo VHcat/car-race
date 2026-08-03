@@ -52,7 +52,7 @@ const Game = {
       magnetTimer: magLv ? (4+magLv*2)*60 : 0, shield:false, x2Timer:0, slowTimer:0, invincibleTimer:0,
       coinChip: 1 + chipLv*.1,
       armorHits: armorLv ? 1+Math.floor((armorLv-1)/2) : 0,
-      wingLv, wingOwned, flyEnergy:100, flying:false, flyAlt:0, flyHeld:false, flyDur:(2+wingLv*.6)*60,
+      wingLv, wingOwned, flyEnergy:100, flying:false, flyAlt:0, flyHeld:false, flyDur:(2+wingLv*.6)*60, flyCd:0,
       state:'countdown', countT:3.3, dieT:0, dieReason:'',
       shake:0, timeScale:1,
       reviveUsed:false, coinX2Buff, startNitroBuff,
@@ -252,7 +252,8 @@ const Game = {
 
     /* ---- 飞行（飞翼装置） ---- */
     if(g.wingLv > 0){
-      if(g.flyHeld && !g.flying && g.flyEnergy >= 15){
+      if(g.flyCd > 0) g.flyCd -= dt;
+      if(g.flyHeld && !g.flying && g.flyEnergy >= 30 && g.flyCd <= 0){
         g.flying = true;
         $('flyBtn').classList.remove('attn');
         AudioSys.takeoff();
@@ -272,14 +273,15 @@ const Game = {
         const wasAir = g.flyAlt > .3;
         g.flyAlt = Math.max(0, g.flyAlt - .11*dt);
         if(wasAir && g.flyAlt <= .3){
-          g.invincibleTimer = Math.max(g.invincibleTimer, 40);
+          g.flyCd = 180;
+          g.invincibleTimer = Math.max(g.invincibleTimer, 10);
           AudioSys.land();
           for(let i=0;i<8;i++){
             g.particles.push({x:g.px+rand(0,g.pw), y:g.py+g.ph-4, vx:rand(-2.4,2.4), vy:rand(-1.5,.5),
               life:rand(14,24), color:'rgba(190,190,190,.7)', size:rand(2,4)});
           }
         }
-        g.flyEnergy = Math.min(100, g.flyEnergy + .3*dt);
+        g.flyEnergy = Math.min(100, g.flyEnergy + .12*dt);
       }
       if(g.fuel <= 0){ g.fuel = 0; this.die('fuel'); return; }
     }
@@ -500,7 +502,7 @@ const Game = {
             g.coins += 5;
             feed('coins', 5);
             g.bonusScore += 25;
-            g.nitro = Math.max(0, g.nitro-8);
+            g.nitro = Math.max(0, g.nitro-15);
             g.shake = Math.max(g.shake, 7);
             this.addFloat(e.x+e.w/2, e.y, '撞飞! +5🪙', '#35e0ff', 16);
             AudioSys.ram();
