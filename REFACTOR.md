@@ -40,4 +40,6 @@
 - Service Worker 离线重载保留存档，离线可开始比赛。
 - `file://` 直接启动、首次教学、起跑灯与开局卡仅消耗一次。
 
-截图保存在 `artifacts/`，不提交生成物。测试使用 Windows Edge / Chromium 触屏模拟；未验证 iOS Safari 真机手势、系统安装面板及真实设备功耗。更新离线发布时需要递增 `sw.js` 缓存版本。本轮只做本地分支提交。
+截图保存在 `artifacts/`，不提交生成物。测试使用 Windows Edge / Chromium 触屏模拟；未验证 iOS Safari 真机手势、系统安装面板及真实设备功耗。更新离线发布时需要递增 `sw.js` 缓存版本。
+
+发布配置：GitHub Pages 从 `master` 根目录发布，使用 `.nojekyll` 静态模式。三个阶段的提交保留在主分支历史中；实际部署结果以 GitHub Pages 构建记录为准。

@@ -8,7 +8,7 @@
 - 本地启动：运行 `npm run serve`，打开 <http://localhost:4173>。
 - 手机与电脑连接同一 Wi-Fi 时，可访问 `http://电脑的局域网IP:4173`（需系统允许局域网访问该端口）。
 - HTTPS 或 localhost 下，首次完整加载后可离线游玩。支持的浏览器可在设置页安装；iPhone 可使用 Safari「分享 → 添加到主屏幕」。普通局域网 HTTP 仅支持在线游玩。
-- 原有 GitHub Pages 地址为 <https://vhcat.github.io/car-race/>；本地提交不会自动更新线上版本。
+- 在线游玩：<https://vhcat.github.io/car-race/>。推送到 `master` 后由 GitHub Pages 发布根目录静态文件。
 
 ## v3 的变化
 
@@ -95,7 +95,7 @@ npm run test:browser
 
 ## 发布与存档
 
-将根目录静态文件部署到 GitHub Pages 等静态服务即可，无需 `node_modules`、`tests`、`tools`。更新离线资源时递增 `sw.js` 的 `CACHE` 版本；新版本在旧页面全部关闭后启用，避免同一场比赛混用脚本版本。
+GitHub Pages 从 `master` 根目录发布；`.nojekyll` 保证页面与脚本直接作为静态文件发布。其他静态服务同样适用，无需 `node_modules`、`tests`、`tools`。更新离线资源时递增 `sw.js` 的 `CACHE` 版本；新版本在旧页面全部关闭后启用，避免同一场比赛混用脚本版本。
 
 进度保存在当前浏览器的 localStorage，不跨设备同步。`REFACTOR.md` 记录分阶段提交与验证结果。
 
