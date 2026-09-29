@@ -6,7 +6,7 @@ const SAVE_DEF = {
   parts:{}, equipped:[],
   powerups:{magnet:2, shield:1, fuel:2, thunder:1, x2coin:0, slowmo:0},
   buffs:{startNitro:0, coinX2:0},
-  bestDistance:0, bestPerRoad:{},
+  bestDistance:0, bestPerRoad:{}, bestSprint:{}, selectedMode:'endless',
   totalDistance:0, totalCoins:0, totalGames:0, totalDodge:0, totalNear:0, totalRam:0, totalPower:0,
   achClaimed:{}, daily:{date:'', ids:[], progress:{}, claimed:{}},
   rewardDay:0, lastRewardDate:'', lastSpinDate:'',
@@ -40,6 +40,7 @@ function normalizeSave(raw){
     .filter(id => Number.isInteger(id) && CARS.some(c => c.id === id));
   result.selectedCar = result.ownedCars.includes(source.selectedCar) ? source.selectedCar : 0;
   result.selectedRoad = ROADS.some(r => r.id === source.selectedRoad) ? source.selectedRoad : 0;
+  result.selectedMode = source.selectedMode === 'sprint' ? 'sprint' : 'endless';
   for(const car of CARS){
     const up = obj(obj(source.upgrades)[car.id]);
     result.upgrades[car.id] = {};
@@ -52,6 +53,7 @@ function normalizeSave(raw){
     for(const id of Object.keys(result[key])) result[key][id] = count(obj(source[key])[id], result[key][id]);
   }
   for(const road of ROADS) result.bestPerRoad[road.id] = count(obj(source.bestPerRoad)[road.id]);
+  for(const road of ROADS) result.bestSprint[road.id] = count(obj(source.bestSprint)[road.id]);
   for(const a of ACHIEVEMENTS) result.achClaimed[a.id] = obj(source.achClaimed)[a.id] === true;
   const daily = obj(source.daily);
   result.daily.date = typeof daily.date === 'string' ? daily.date.slice(0, 40) : '';

@@ -2,9 +2,10 @@
 
 // One pointer owns steering. The other thumb can hold an ability independently.
 const Input = {
-  steering: null, originX: 0, carX: 0,
+  steering: null, originX: 0, carX: 0, releases:[],
   clear(){
     this.steering = null;
+    this.releases.forEach(release=>release());
     const g = Game.g;
     if(g) Object.assign(g, {moveLeft:false, moveRight:false, nitroHeld:false,
       flyHeld:false, touching:false, touchTargetX:null});
@@ -64,6 +65,7 @@ const Input = {
   },
   hold(button, property){
     let owner = null;
+    this.releases.push(()=>{owner=null;});
     button.addEventListener('pointerdown', e => {
       e.preventDefault();
       const g = Game.g;
@@ -85,7 +87,7 @@ const Input = {
 
 function suspendGame(){
   Input.clear();
-  if(Game.g && !Game.paused && ['run', 'countdown'].includes(Game.g.state)) Game.togglePause();
+  if(Game.g && !Game.paused && ['run', 'countdown', 'revive'].includes(Game.g.state)) Game.togglePause();
   AudioSys.stopMusic();
   AudioSys.setEngine(0, false);
 }

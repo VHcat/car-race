@@ -122,6 +122,7 @@ const RaceRenderer = {
     c.globalAlpha = 1;
 
     /* 冰面 */
+    RaceDirector.draw(c,g,W,H);
     for(const ic of g.ice){
       c.fillStyle = 'rgba(190,225,250,.5)';
       rr(c, ic.x, ic.y, ic.w, ic.h, 14); c.fill();

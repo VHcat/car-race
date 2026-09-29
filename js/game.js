@@ -4,12 +4,11 @@ const Game = {
   g:null, raf:0, paused:false,
   cv:null, ctx:null, W:0, H:0, dpr:1,
   lastTs:0,
-  reviveTimeout:0,
 
   /* ---------- 启动 ---------- */
   start(){
     if(!S.tutorialDone){ Tutorial.show(); return; }
-    clearTimeout(this.reviveTimeout);
+    UI.clearFeedback();
     Input.clear();
     this.g = null;
     UI.go.call(UI, 'gameScreen');
@@ -44,10 +43,10 @@ const Game = {
       nitroPower: 1.45 + eff('nitro')*.05,
       nitroDrain: Math.max(13, 30 - eff('nitro')*1.1)/60,
       nitroRegen: recLv*1.2/60,
-      fuel:fuelCap, fuelCap, fuelDrain: .028 + road.traffic*.006,
+      fuel:fuelCap, fuelCap, fuelDrain: .016 + road.traffic*.003,
       distance:0, dashScroll:0, coins:0, bonusScore:0, score:0,
       combo:0, comboTimer:0,
-      nitro: startNitroBuff ? 100 : 30, nitroActive:false,
+      nitro: startNitroBuff ? 100 : 45, nitroActive:false,
       enemies:[], coinsArr:[], items:[], particles:[], floats:[],
       scenery:[], weather:[], ice:[],
       enemyTimer:0, coinTimer:0, itemTimer: irand(300,500), sceneryTimer:0,
@@ -65,6 +64,7 @@ const Game = {
       frame:0,
       hzSeed: (Math.random()*1e9)|0,
     };
+    RaceDirector.init(this.g);
     /* 初始 scenery */
     for(let y=-60; y<this.H+80; y+=rand(70,130)){
       this.spawnScenery(y);
@@ -115,7 +115,6 @@ const Game = {
     cancelAnimationFrame(this.raf);
     this.g = null;
     this.paused = false;
-    clearTimeout(this.reviveTimeout);
     document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('active'));
     AudioSys.setEngine(0, false);
     AudioSys.stopMusic();
@@ -123,11 +122,12 @@ const Game = {
   },
 
   togglePause(){
-    if(!this.g || this.g.state==='dying' || this.g.state==='revive') return;
+    if(!this.g || this.g.state==='dying') return;
     this.paused = !this.paused;
     Input.clear();
     RaceClock.reset();
     $('pauseOverlay').classList.toggle('active', this.paused);
+    if(this.g.state==='revive') $('reviveOverlay').classList.toggle('active',!this.paused);
     AudioSys.click();
     if(this.paused){ AudioSys.setEngine(0, false); AudioSys.stopMusic(); }
     else { AudioSys.ensure(); AudioSys.startMusic(); }
@@ -232,74 +232,18 @@ const Game = {
       if(g.dieT <= 0) this.tryReviveOrFinish();
       return;
     }
-    if(g.state==='revive') return;
+    if(g.state==='revive'){
+      g.reviveT-=dtRaw;
+      $('rvTimerBar').style.width=Math.max(0,g.reviveT/360*100)+'%';
+      if(g.reviveT<=0) this.declineRevive();
+      return;
+    }
 
     /* ---- 难度与速度 ---- */
     const difficulty = Math.min(3.2, 1 + Math.pow(g.distance/2500, 1.3));
-    let target = g.maxSpeed * Math.min(difficulty, 2.2);
-    /* 氮气 */
-    if(g.nitroHeld && g.nitro > 0){
-      if(!g.nitroActive){ g.nitroActive = true; AudioSys.nitro(); buzz(20); }
-    } else g.nitroActive = false;
-    if(g.nitroActive){
-      target *= g.nitroPower;
-      g.nitro = Math.max(0, g.nitro - g.nitroDrain*100/60*dt);
-      if(g.nitro <= 0) g.nitroActive = false;
-      if(S.settings.quality==='high' && g.frame%2===0){
-        g.particles.push({x:g.px+g.pw*.32+rand(-3,3), y:g.py+g.ph, vx:rand(-.4,.4), vy:rand(2,4),
-          life:18, color:'rgba(53,224,255,.8)', size:rand(2,4)});
-        g.particles.push({x:g.px+g.pw*.68+rand(-3,3), y:g.py+g.ph, vx:rand(-.4,.4), vy:rand(2,4),
-          life:18, color:'rgba(120,200,255,.8)', size:rand(2,4)});
-      }
-    }
-    const acc = g.accelRate * (g.nitroActive ? 2.4 : 1) * dt;
-    g.pSpeed += clamp(target - g.pSpeed, -0.14*dt, acc);
-    if(g.nitroRegen) g.nitro = Math.min(100, g.nitro + g.nitroRegen*dt);
-    $('nitroBtn').classList.toggle('firing', g.nitroActive);
-    $('nitroBtn').style.setProperty('--n', g.nitro);
-
-    /* ---- 油量 ---- */
-    g.fuel -= g.fuelDrain * (g.pSpeed/g.maxSpeed) * dt * (g.nitroActive?1.8:1);
-    if(g.fuel <= 25 && !g.lowWarn25){ g.lowWarn25=true; AudioSys.lowFuel(); UI.toast('⛽ 油量不足，注意检查站补给！'); }
-    if(g.fuel <= 10 && !g.lowWarn10){ g.lowWarn10=true; AudioSys.lowFuel(); buzz(60); }
-    $('fuelTrack').classList.toggle('low', g.fuel<=25);
-    if(g.fuel <= 0){ g.fuel = 0; this.die('fuel'); return; }
-
-    /* ---- 飞行（飞翼装置） ---- */
-    if(g.wingLv > 0){
-      if(g.flyCd > 0) g.flyCd -= dt;
-      if(g.flyHeld && !g.flying && g.flyEnergy >= 30 && g.flyCd <= 0){
-        g.flying = true;
-        $('flyBtn').classList.remove('attn');
-        AudioSys.takeoff();
-        this.addFloat(g.px+g.pw/2, g.py-18, '起飞!', '#f7b731', 15);
-        buzz(20);
-      }
-      if(g.flying && (!g.flyHeld || g.flyEnergy <= 0)) g.flying = false;
-      if(g.flying){
-        g.flyAlt = Math.min(1, g.flyAlt + .09*dt);
-        g.flyEnergy = Math.max(0, g.flyEnergy - 100/g.flyDur*dt);
-        g.fuel -= g.fuelDrain*.6*dt;
-        if(S.settings.quality==='high' && g.frame%3===0){
-          g.particles.push({x:g.px+rand(0,g.pw), y:g.py+g.ph, vx:rand(-.6,.6), vy:rand(3,5),
-            life:16, color:'rgba(255,255,255,.5)', size:rand(1.5,3)});
-        }
-      } else {
-        const wasAir = g.flyAlt > .3;
-        g.flyAlt = Math.max(0, g.flyAlt - .11*dt);
-        if(wasAir && g.flyAlt <= .3){
-          g.flyCd = 180;
-          g.invincibleTimer = Math.max(g.invincibleTimer, 10);
-          AudioSys.land();
-          for(let i=0;i<8;i++){
-            g.particles.push({x:g.px+rand(0,g.pw), y:g.py+g.ph-4, vx:rand(-2.4,2.4), vy:rand(-1.5,.5),
-              life:rand(14,24), color:'rgba(190,190,190,.7)', size:rand(2,4)});
-          }
-        }
-        g.flyEnergy = Math.min(100, g.flyEnergy + .12*dt);
-      }
-      if(g.fuel <= 0){ g.fuel = 0; this.die('fuel'); return; }
-    }
+    if(!RaceDirector.update(this, dt)) return;
+    let target = g.maxSpeed * Math.min(difficulty, 2.2) * (g.windBoost ? 1.15 : 1);
+    if(!RaceAbilities.update(this, dt, target)) return;
 
     /* ---- 玩家移动 ---- */
     const prevX = g.px;
@@ -331,7 +275,8 @@ const Game = {
     g.tilt = lerp(g.tilt, clamp(g.vx*.05, -.28, .28), .25);
 
     /* ---- 距离 / 得分 / 检查站 ---- */
-    g.distance += g.pSpeed*.6*dt;
+    // The speedometer is km/h; distance is meters and dt is one 60 Hz tick.
+    g.distance += g.pSpeed*28/3.6/60*dt;
     g.dashScroll += g.pSpeed*dt;
     if(g.combo > 0){
       g.comboTimer -= dt;
@@ -340,7 +285,7 @@ const Game = {
     g.score = Math.floor(g.distance*.1 + g.bonusScore);
     if(g.distance >= g.checkpointNext){
       g.checkpointNext += 500;
-      g.fuel = Math.min(g.fuelCap, g.fuel + 5);
+      g.fuel = Math.min(g.fuelCap, g.fuel + 8);
       const bonus = Math.round(15*g.road.coinMul);
       g.coins += bonus;
       feed('coins', bonus);
@@ -378,79 +323,7 @@ const Game = {
       g.items.push({x: g.roadX + rand(24, g.roadW-24), y:-30, type, size:22, t:0});
     }
 
-    /* ---- 敌车运动 / 变道 ---- */
-    const slow = g.slowTimer>0 ? .35 : 1;
-    for(const e of g.enemies){
-      e.y += (g.pSpeed - e.speed)*slow*dt;
-      /* 变道决策：跑车追猎玩家车道，其余车辆随机缓变道 */
-      if(e.targetX===undefined && e.changeDelay===undefined && e.y > this.H*.08 && e.y < this.H*.46 && Math.random() < e.changeRate*dt){
-        const cur = e.lane;
-        let nl;
-        if(e.changer){
-          const pLane = Math.floor((g.px + g.pw/2 - g.roadX)/g.laneW);
-          nl = cur + (pLane > cur ? 1 : pLane < cur ? -1 : (Math.random()<.5?-1:1));
-        } else {
-          nl = cur + (Math.random()<.5?-1:1);
-        }
-        if(nl<0) nl = cur+1; if(nl>=g.laneCount) nl = cur-1;
-        if(nl>=0 && nl<g.laneCount && nl!==cur){
-          const tx = g.roadX + nl*g.laneW + (g.laneW-e.w)/2 + rand(-8,8);
-          const blocked = g.enemies.some(o=>o!==e && Math.abs(o.x-tx)<e.w && Math.abs(o.y-e.y)<e.h+90);
-          if(!blocked){ e.dir = nl>cur?1:-1; e.blink = 1; e.blinkFrame = 0; e.changeDelay = 50; e.targetLane = nl; e.pendingX = tx; }
-        }
-      }
-      if(e.blink){
-        e.blinkFrame += dt;
-        if(e.changeDelay !== undefined){
-          e.changeDelay -= dt*slow;
-          if(e.changeDelay <= 0){
-            e.targetX = clamp(e.pendingX, g.roadX+2, g.roadX+g.roadW-e.w-2);
-            e.startX = e.x; e.changeT = 0;
-            e.changeDelay = undefined;
-          }
-        }
-      }
-      if(e.targetX !== undefined){
-        /* 定时 S 曲线漂移：缓起缓收，给玩家反应时间 */
-        e.changeT += dt*slow;
-        const p = Math.min(1, e.changeT / e.changeDur);
-        const s = p*p*(3-2*p);
-        e.x = e.startX + (e.targetX - e.startX)*s;
-        if(p >= 1){ e.x = e.targetX; e.targetX = undefined; e.blink = 0; e.lane = e.targetLane; }
-      }
-    }
-    /* 通过判定 + 险胜 */
-    g.enemies = g.enemies.filter(e=>{
-      if(e.y > this.H + 60) return false;
-      if(!e.passed && e.y > g.py + g.ph){
-        e.passed = true;
-        g.dodgeCount++;
-        feed('dodge', 1);
-        g.bonusScore += 5;
-        const gapX = Math.abs((e.x+e.w/2) - (g.px+g.pw/2));
-        if(!e.nearDone && gapX < g.laneW*1.12 && e.speed < g.pSpeed && g.flyAlt < .35){
-          e.nearDone = true;
-          g.combo++;
-          g.comboTimer = 220;
-          g.maxCombo = Math.max(g.maxCombo, g.combo);
-          g.nearCount++;
-          feed('near', 1);
-          feed('combo', g.combo);
-          g.nitro = Math.min(100, g.nitro + 13);
-          g.bonusScore += 10*g.combo;
-          this.addFloat(e.x+e.w/2, g.py-10, g.combo>=3?`险胜! 连击×${g.combo}`:'险胜!', '#ffd60a', 17);
-          AudioSys.near();
-          buzz(12);
-          g.shake = Math.max(g.shake, 2.5);
-          const hc = $('hudCombo');
-          if(g.combo >= 3){
-            hc.textContent = `🔥 连击 ×${g.combo}`;
-            hc.classList.remove('on'); void hc.offsetWidth; hc.classList.add('on');
-          }
-        }
-      }
-      return true;
-    });
+    RaceTraffic.update(this, dt);
 
     /* ---- 金币 ---- */
     const magnetR = 160 + (g.nitroActive?50:0);
@@ -480,11 +353,12 @@ const Game = {
       return true;
     });
     /* ---- 金币碰撞 ---- */
-    const mult = (g.x2Timer>0?2:1) * (g.coinX2Buff?2:1) * g.coinChip;
+    const mult = (g.x2Timer>0?2:1) * (g.coinX2Buff?2:1) * g.coinChip * g.road.coinMul;
     for(const c of g.coinsArr){
       if(!c.got && rectOverlap(g.px, g.py, g.pw, g.ph, c.x-c.size/2, c.y-c.size/2, c.size, c.size)){
         c.got = true;
         g.coins += mult;
+        g.collectedCoins += mult;
         feed('coins', mult);
         g.bonusScore += 3;
         g.combo++;
@@ -569,45 +443,7 @@ const Game = {
   },
 
   /* ---------- 生成 ---------- */
-  spawnEnemy(difficulty){
-    const g = this.g;
-    /* 可解性：按实际矩形覆盖计算被占车道，至少保留一条空车道 */
-    const blocked = new Set();
-    for(const e of g.enemies){
-      if(e.y < this.H*.42){
-        const l0 = Math.max(0, Math.floor((e.x - g.roadX)/g.laneW));
-        const l1 = Math.min(g.laneCount-1, Math.floor((e.x + e.w - 1 - g.roadX)/g.laneW));
-        for(let l=l0; l<=l1; l++) blocked.add(l);
-      }
-    }
-    if(blocked.size >= g.laneCount-1) return;
-    const free = [];
-    for(let l=0; l<g.laneCount; l++) if(!blocked.has(l)) free.push(l);
-    const lane = pick(free);
-    /* 加权选车型 */
-    const pool = [];
-    ENEMY_TYPES.forEach(t=>{ for(let i=0;i<t.weight;i++) pool.push(t); });
-    const type = pick(pool);
-    const scale = g.laneW / 80;
-    const w = type.w*scale, h = type.h*scale, y = -h-24;
-    const cx = g.roadX + lane*g.laneW + (g.laneW-w)/2;
-    /* Keep traffic inside its declared lane to preserve the free-lane guarantee. */
-    const maxOff = Math.max(4, (g.laneW-w)/2 - 2) * .7;
-    let x = cx + rand(-maxOff, maxOff);
-    /* 顶部清空（按实际矩形判定，避免压线车互相重叠） */
-    if(g.enemies.some(o=>o.y < 130 && rectOverlap(x, y, w, h, o.x, o.y, o.w, o.h))) return;
-    const big = type.name==='truck' || type.name==='bus';
-    g.enemies.push({
-      x, y, w, h, lane,
-      speed: rand(type.sp[0], type.sp[1]) + (difficulty-1)*.25,
-      color: pick(ENEMY_COLORS),
-      type: type.name,
-      changer: !!type.changer && difficulty > 2.0,
-      changeRate: type.changer ? .012 : (big ? .0025 : .005),
-      changeDur: big ? 70 : (type.changer ? 45 : 60),
-      passed:false, nearDone:false, blink:0, blinkFrame:0, targetX:undefined, dir:0,
-    });
-  },
+  spawnEnemy(difficulty){ RaceTraffic.spawn(this, difficulty); },
   spawnCoins(){
     const g = this.g;
     const r = Math.random();
@@ -727,9 +563,9 @@ const Game = {
       $('rvCoinBtn').querySelector('span').textContent = `🪙 ${cost} 复活`;
       $('rvGemBtn').disabled = S.gems < 5;
       const bar = $('rvTimerBar');
-      bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = '';
+      bar.style.animation = 'none'; bar.style.width='100%';
+      g.reviveT=360;
       $('reviveOverlay').classList.add('active');
-      this.reviveTimeout = setTimeout(()=>this.declineRevive(), 6000);
       return;
     }
     this.finishRun();
@@ -741,7 +577,6 @@ const Game = {
     if(mode==='coins'){ if(S.coins < cost) return; S.coins -= cost; }
     else if(mode === 'gems'){ if(S.gems < 5) return; S.gems -= 5; }
     else return;
-    clearTimeout(this.reviveTimeout);
     g.reviveUsed = true;
     $('reviveOverlay').classList.remove('active');
     g.enemies.forEach(e=>this.explode(e.x+e.w/2, e.y+e.h/2));
@@ -761,7 +596,6 @@ const Game = {
   declineRevive(){
     const g = this.g;
     if(!g || g.state!=='revive') return;
-    clearTimeout(this.reviveTimeout);
     $('reviveOverlay').classList.remove('active');
     this.finishRun();
   },
@@ -769,7 +603,6 @@ const Game = {
     const g = this.g;
     if(!g || g.settled) return;
     g.settled = true;
-    clearTimeout(this.reviveTimeout);
     Input.clear();
     AudioSys.setEngine(0, false);
     AudioSys.stopMusic();
@@ -778,22 +611,24 @@ const Game = {
     S.totalDodge += g.dodgeCount;
     S.totalNear += g.nearCount;
     S.totalRam += g.ramCount;
-    const completionBonus = Math.floor(20 + dist/50);
+    const completionBonus = Math.floor(20 + dist/50) + (g.dieReason==='complete' ? 100 : 0);
     g.coins = Math.floor(g.coins + completionBonus);
     S.totalCoins += g.coins;
     S.coins += g.coins;
     feed('dist', dist);
     let record = false;
-    if(dist > S.bestDistance){ S.bestDistance = dist; record = true; }
+    if(g.mode==='endless' && dist > S.bestDistance){ S.bestDistance = dist; record = true; }
     const rk = g.road.id;
-    if(dist > (S.bestPerRoad[rk]||0)){ S.bestPerRoad[rk] = dist; record = record || dist>200; }
+    const records = g.mode==='sprint' ? S.bestSprint : S.bestPerRoad;
+    if(dist > (records[rk]||0)){ records[rk] = dist; record = record || dist>200; }
     const xp = Math.floor(dist/8) + g.coins;
     const ups = UI.grantXp(xp);
     save();
 
-    $('goStamp').textContent = g.dieReason==='fuel' ? '没油了!' : '撞车了!';
-    $('goReason').textContent = g.dieReason==='fuel' ? '记得点击备用油箱补油，检查站也有补给' : '留意来车转向灯，预留一点躲避空间';
-    $('goBest').textContent = fmt(S.bestDistance) + ' m';
+    $('goStamp').textContent = g.dieReason==='complete' ? '冲刺完成！' : g.dieReason==='fuel' ? '下次，跑更远。' : '再挑战一次。';
+    $('goReason').textContent = g.dieReason==='complete' ? '90 秒全力以赴 · 完赛奖励 +100 金币' : g.dieReason==='fuel' ? '燃油耗尽 · 记得点击备用油箱补油' : '发生碰撞 · 留意转向灯，预留躲避空间';
+    $('goBest').textContent = fmt(records[rk]||0) + ' m';
+    $('goRunDetails').innerHTML = `<span>险胜 ${g.nearCount} 次</span><span>最高连击 ×${g.maxCombo}</span><span>挑战 ${g.challenges.filter(c=>c.done).length}/3 · +${g.challengeBonus} 金币</span>`;
     $('goRecord').classList.toggle('on', record);
     $('goXp').textContent = `+${fmt(xp)} 经验` + (ups>0 ? ` · 升级至 LV.${S.level}！` : ` · LV.${S.level} ${levelTitle(S.level)}`);
     $('goBonus').textContent = `+${completionBonus}`;
@@ -841,8 +676,11 @@ const Game = {
     $('hudRoute').textContent = g.road.name;
     $('hudNext').textContent = `${Math.ceil(g.checkpointNext - g.distance)}m 后补给`;
     $('checkpointFill').style.width = (g.distance % 500 / 5) + '%';
+    RaceDirector.hud(g);
     $('hudCoins').textContent = fmt(g.coins);
     $('hudScore').textContent = fmt(g.score);
+    $('hudCombo').classList.toggle('on',g.combo>=3);
+    if(g.combo>=3) $('hudCombo').textContent=`连击 ×${g.combo}`;
     $('fuelFill').style.width = (g.fuel/g.fuelCap*100) + '%';
     $('fuelNum').textContent = Math.ceil(g.fuel);
     $('nitroBtn').style.setProperty('--n', g.nitro);
@@ -858,7 +696,9 @@ const Game = {
 
   /* ---------- 尺寸 ---------- */
   dockHeight(){
-    return Math.max(120, document.querySelector('.hud-bottom').getBoundingClientRect().height);
+    const dock=document.querySelector('.hud-bottom');
+    const bottom=parseFloat(getComputedStyle(document.querySelector('.hud')).paddingBottom)||12;
+    return Math.max(120, dock.getBoundingClientRect().height+Math.max(0,bottom-12));
   },
   resize(){
     const oldHeight = this.H || innerHeight;

@@ -4,6 +4,7 @@ const UI = {
   current: 'menuScreen',
   go(id){
     if(this.current === id) return;
+    this.clearFeedback();
     if(this.current === 'garageScreen') Garage.close();
     document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
     $(id).classList.add('active');
@@ -18,6 +19,10 @@ const UI = {
     if(id==='rewardScreen') Rewards.render();
     if(id==='missionScreen') Missions.render();
     if(id==='settingsScreen') Settings.render();
+  },
+  clearFeedback(){
+    $('toastWrap').replaceChildren();
+    $('bannerEl').classList.remove('show');
   },
   toast(msg){
     const wrap = $('toastWrap');
@@ -61,11 +66,21 @@ const UI = {
   },
   updateRoad(){
     $('roadCoins').textContent = fmt(S.coins);
+    const picker=$('modePicker');
+    picker.innerHTML='';
+    for(const [id,mode] of Object.entries(RaceDirector.modes)){
+      const button=document.createElement('button');
+      button.className='mode-card'+(S.selectedMode===id?' selected':'');
+      button.setAttribute('aria-pressed',S.selectedMode===id);
+      button.innerHTML=`<b>${id==='endless'?'∞':'◷'} ${mode.name}</b><small>${mode.desc}</small>`;
+      button.addEventListener('click',()=>{S.selectedMode=id;save();this.updateRoad();});
+      picker.appendChild(button);
+    }
     const grid = $('roadGrid');
     grid.innerHTML = '';
     ROADS.forEach(r=>{
       const th = THEMES[r.theme];
-      const best = S.bestPerRoad[r.id] || 0;
+      const best = (S.selectedMode==='sprint'?S.bestSprint:S.bestPerRoad)[r.id] || 0;
       const card = document.createElement('button');
       card.setAttribute('aria-pressed', S.selectedRoad === r.id);
       card.className = 'road-card' + (S.selectedRoad===r.id ? ' selected' : '');
@@ -170,7 +185,7 @@ const Garage = {
     CARS.forEach((c,i)=>{
       const d = document.createElement('span');
       d.className = 'g-dot' + (i===this.idx?' active':'');
-      d.addEventListener('click', ()=>{ this.idx = i; this.render(); });
+      d.setAttribute('aria-hidden','true');
       dots.appendChild(d);
     });
     const btn = $('gActionBtn');
@@ -185,6 +200,7 @@ const Garage = {
   },
   upgrade(key){
     const car = CARS[this.idx];
+    if(!S.ownedCars.includes(car.id) || !STAT_META.some(stat=>stat.key===key)) return;
     const up = this.ups(car.id);
     const lvl = up[key];
     const cost = 150*(lvl+1);
@@ -332,6 +348,7 @@ const Mod = {
     UI.updateWallets();
   },
   buy(p){
+    if((S.parts[p.id]||0)>0) return;
     if(p.gem){ if(S.gems < p.gem){ UI.toast('钻石不足！完成任务和签到可获得钻石'); return; } S.gems -= p.gem; }
     else { if(S.coins < p.price){ UI.toast('金币不足！去跑几圈赚点钱吧'); return; } S.coins -= p.price; }
     S.parts[p.id] = 1;
@@ -356,6 +373,7 @@ const Mod = {
     this.render();
   },
   toggleEquip(p){
+    if(!(S.parts[p.id]>0)) return;
     const i = S.equipped.indexOf(p.id);
     if(i >= 0){
       S.equipped.splice(i, 1);
@@ -380,6 +398,7 @@ const Bank = {
   },
   spin(bet){
     if(this.spinning) return;
+    if(![68,268,580].includes(bet)) return;
     const free = bet===68 && S.lastSpinDate !== todayStr();
     if(!free && S.coins < bet){ UI.toast('金币不足！'); return; }
     if(free){ S.lastSpinDate = todayStr(); UI.toast('🎁 使用今日免费一转！'); }
@@ -432,6 +451,10 @@ const Bank = {
       rewardText = '😢 谢谢参与，下次好运！';
       apply = ()=>{};
     }
+    // Persist the completed transaction before the reveal animation, so closing
+    // the page cannot lose a payout after the stake has already been deducted.
+    apply();
+    save();
     /* 依次停轮 */
     reels.forEach((r,i)=>{
       setTimeout(()=>{
@@ -440,7 +463,6 @@ const Bank = {
         AudioSys.click();
         if(i===2){
           clearInterval(spinIv);
-          apply();
           const won = rewardText.includes('+') || rewardText.includes('中奖');
           const breakEven = rewardText.includes('保本');
           if(won){ reels.forEach(x=>x.classList.add('win')); AudioSys.win(); buzz([30,50,30,50,80]); }
@@ -466,7 +488,9 @@ const Rewards = {
     REWARDS.forEach(r=>{
       const claimed = r.day <= S.rewardDay;
       const ready = r.day === S.rewardDay+1 && S.lastRewardDate !== today;
-      const el = document.createElement('div');
+      const el = document.createElement('button');
+      el.disabled = !ready;
+      el.setAttribute('aria-label',`第 ${r.day} 天签到奖励${claimed?'，已领取':ready?'，可领取':'，未解锁'}`);
       el.className = 'rw-cell' + (claimed?' claimed':'') + (ready?' ready':'');
       el.innerHTML = `
         <span class="d">第${r.day}天</span>
@@ -477,6 +501,7 @@ const Rewards = {
     });
   },
   claim(r){
+    if(r.day!==S.rewardDay+1 || S.lastRewardDate===todayStr()) return;
     if(r.gem) S.gems += r.amount;
     else if(r.type) S.powerups[r.type] = (S.powerups[r.type]||0) + r.amount;
     else S.coins += r.amount;
@@ -550,6 +575,7 @@ const Missions = {
     if(rw.gems) S.gems += rw.gems;
   },
   claimDaily(id){
+    ensureDaily();
     const m = DAILY_POOL.find(x=>x.id===id);
     if(!m || S.daily.claimed[id] || (S.daily.progress[m.stat]||0) < m.target) return;
     S.daily.claimed[id] = true;

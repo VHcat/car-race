@@ -23,8 +23,9 @@ const RaceLayout = {
     const roadW = laneW * lanes;
     const pw = laneW * .49;
     const ph = pw * 1.7;
+    const landscape=width>height && height<=540;
     return { laneW, roadW, roadX: (width - roadW) / 2, pw, ph,
-      py: Math.max(height * .38, height - dock - ph - 26) };
+      py: landscape ? height-ph-38 : Math.max(height * .38, height - dock - ph - 26) };
   },
   remap(g, next, oldHeight, height) {
     const oldX = g.roadX, oldW = g.roadW, oldLane = g.laneW;
@@ -45,6 +46,7 @@ const RaceLayout = {
       }
     }
     for (const item of g.scenery) { item.x = mapX(item.x); item.y *= height / oldHeight; }
+    for (const hazard of g.hazards || []) hazard.y += dy;
     Object.assign(g, next);
     g.px = clamp(center - g.pw / 2, g.roadX + 4, g.roadX + g.roadW - g.pw - 4);
     g.touching = false; g.touchTargetX = null;

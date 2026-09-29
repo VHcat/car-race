@@ -7,7 +7,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="来呀！赛车">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#0e1116">
+<meta name="theme-color" content="#101714">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
 <meta name="format-detection" content="telephone=no">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏎️</text></svg>">
 <title>Come on! Racing - 来呀！赛车</title>
@@ -75,6 +77,8 @@
     <div class="race-progress"><div><span id="hudRoute">乡村公路</span><span id="hudNext">500m 后补给</span></div><div class="race-progress-track"><i id="checkpointFill"></i></div></div>
     <div id="hudCombo">连击 x3</div>
     <div id="hudChallenge" class="hud-challenge"></div>
+    <div id="hudTimer" class="hud-timer" hidden>1:30</div>
+    <div id="hudEvent" class="hud-event" hidden></div>
     <div class="hud-bottom">
       <div class="fuel-wrap">
         <span class="fi">⛽</span>
@@ -112,9 +116,9 @@
     </div>
     <div class="g-stats" id="gStats"></div>
     <div class="g-nav">
-      <button class="g-arrow" onclick="Garage.nav(-1)">‹</button>
+      <button class="g-arrow" aria-label="上一辆赛车" onclick="Garage.nav(-1)">‹</button>
       <div class="g-dots" id="gDots"></div>
-      <button class="g-arrow" onclick="Garage.nav(1)">›</button>
+      <button class="g-arrow" aria-label="下一辆赛车" onclick="Garage.nav(1)">›</button>
     </div>
     <div class="g-action">
       <button class="rbtn rbtn-green" id="gActionBtn" onclick="Garage.action()"><span>选择</span></button>
@@ -217,6 +221,7 @@
     <span style="width:64px"></span>
   </div>
   <div class="set-list">
+    <div class="set-row" id="installRow" hidden><label>装进口袋<small>添加到主屏幕，随时离线开一局</small></label><button id="installBtn" class="rbtn rbtn-sm rbtn-green">安装</button></div>
     <div class="set-row"><label>转向方式<small>相对拖动不会在按下时跳车</small></label><div class="seg"><button id="controlRelative" onclick="Settings.control('relative')">拖动</button><button id="controlDirect" onclick="Settings.control('direct')">跟手</button></div></div>
     <div class="set-row"><label>减少动态效果<small>关闭画面震动与速度线</small></label><button class="switch" id="swReduced" aria-label="减少动态效果" onclick="Settings.toggle('reducedMotion','swReduced')"></button></div>
     <div class="set-row">
@@ -242,7 +247,7 @@
       <button class="rbtn rbtn-red rbtn-sm" onclick="Settings.confirmReset()"><span>🗑️ 重置所有数据</span></button>
     </div>
   </div>
-  <div class="set-about">Come on! Racing v3.0<br>纯前端 · 零依赖 · 进度自动保存在本地</div>
+  <div class="set-about">Come on! Racing v3.0<br><span id="offlineStatus">进度自动保存在当前设备</span><br>iPhone：Safari → 分享 → 添加到主屏幕</div>
 </div>
 
 <!-- ================= GAME OVER ================= -->
@@ -276,7 +281,7 @@
     <div class="ov-btns">
       <button class="rbtn rbtn-green" onclick="Game.togglePause()"><span>▶ 继续比赛</span></button>
       <button class="rbtn" onclick="Game.restart()"><span>🔄 重新开始</span></button>
-      <button class="rbtn rbtn-red" onclick="Game.quit()"><span>🏳️ 退出比赛</span></button>
+      <button class="rbtn rbtn-ghost" onclick="Game.quit()"><span>退出并放弃本局收益</span></button>
     </div>
   </div>
 </div>
@@ -325,7 +330,11 @@
 <script src="js/menu-scene.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/renderer.js"></script>
+<script src="js/director.js"></script>
+<script src="js/abilities.js"></script>
+<script src="js/traffic.js"></script>
 <script src="js/game.js"></script>
 <script src="js/main.js"></script>
+<script src="js/pwa.js"></script>
 </body>
 </html>

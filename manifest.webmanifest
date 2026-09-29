@@ -1,0 +1,17 @@
+{
+  "id": "./",
+  "name": "来呀！赛车 · Come On Racing",
+  "short_name": "来呀赛车",
+  "description": "拇指掌舵，穿越车流。六条赛道、自由改装与 90 秒冲刺。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#101714",
+  "theme_color": "#101714",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
