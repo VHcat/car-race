@@ -1,141 +1,117 @@
 'use strict';
-/* ================= 初始化 & 全局输入 ================= */
 
-/* ---- 键盘 ---- */
-document.addEventListener('keydown', e=>{
-  const g = Game.g;
-  if(!g) return;
-  if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A') g.moveLeft = true;
-  if(e.key==='ArrowRight' || e.key==='d' || e.key==='D') g.moveRight = true;
-  if(e.key===' ' || e.key==='ArrowUp' || e.key==='w' || e.key==='W'){ g.nitroHeld = true; e.preventDefault(); }
-  if(e.key==='f' || e.key==='F' || e.key==='Shift'){ g.flyHeld = true; }
-  if(e.key==='Escape' || e.key==='p' || e.key==='P') Game.togglePause();
-  const idx = '123456'.indexOf(e.key);
-  if(idx >= 0) Game.usePowerup(Game.PU_ORDER[idx]);
-});
-document.addEventListener('keyup', e=>{
-  const g = Game.g;
-  if(!g) return;
-  if(e.key==='ArrowLeft' || e.key==='a' || e.key==='A') g.moveLeft = false;
-  if(e.key==='ArrowRight' || e.key==='d' || e.key==='D') g.moveRight = false;
-  if(e.key===' ' || e.key==='ArrowUp' || e.key==='w' || e.key==='W') g.nitroHeld = false;
-  if(e.key==='f' || e.key==='F' || e.key==='Shift') g.flyHeld = false;
-});
-/* 窗口失焦时按键可能收不到 keyup，清掉所有输入状态避免自动转向 */
-window.addEventListener('blur', ()=>{
-  const g = Game.g;
-  if(g){ g.moveLeft = false; g.moveRight = false; g.nitroHeld = false; g.flyHeld = false; }
-});
-
-/* ---- 触屏 / 鼠标转向（位置跟随） ---- */
-const gameCanvas = $('gameCanvas');
-gameCanvas.addEventListener('touchstart', e=>{
-  e.preventDefault();
-  const g = Game.g;
-  if(!g || g.state!=='run') return;
-  g.touchTargetX = e.touches[0].clientX;
-  g.touching = true;
-}, {passive:false});
-gameCanvas.addEventListener('touchmove', e=>{
-  e.preventDefault();
-  const g = Game.g;
-  if(!g) return;
-  g.touchTargetX = e.touches[0].clientX;
-}, {passive:false});
-gameCanvas.addEventListener('touchend', e=>{
-  e.preventDefault();
-  const g = Game.g;
-  if(!g) return;
-  g.touching = false;
-  g.touchTargetX = null;
-}, {passive:false});
-/* 系统手势（来电等）触发 touchcancel，同样要结束跟随，否则车辆一直漂移 */
-gameCanvas.addEventListener('touchcancel', e=>{
-  e.preventDefault();
-  const g = Game.g;
-  if(!g) return;
-  g.touching = false;
-  g.touchTargetX = null;
-}, {passive:false});
-gameCanvas.addEventListener('mousedown', e=>{
-  const g = Game.g;
-  if(!g || g.state!=='run') return;
-  g.touchTargetX = e.clientX;
-  g.touching = true;
-});
-gameCanvas.addEventListener('mousemove', e=>{
-  const g = Game.g;
-  if(g && g.touching) g.touchTargetX = e.clientX;
-});
-window.addEventListener('mouseup', ()=>{
-  const g = Game.g;
-  if(g){ g.touching = false; g.touchTargetX = null; }
-});
-
-/* ---- 氮气按钮（长按） ---- */
-const nitroBtn = $('nitroBtn');
-nitroBtn.addEventListener('pointerdown', e=>{
-  e.preventDefault();
-  const g = Game.g;
-  if(g && g.state==='run') g.nitroHeld = true;
-});
-['pointerup','pointerleave','pointercancel'].forEach(ev=>{
-  nitroBtn.addEventListener(ev, ()=>{
+// One pointer owns steering. The other thumb can hold an ability independently.
+const Input = {
+  steering: null, originX: 0, carX: 0,
+  clear(){
+    this.steering = null;
     const g = Game.g;
-    if(g) g.nitroHeld = false;
-  });
-});
-nitroBtn.addEventListener('contextmenu', e=>e.preventDefault());
+    if(g) Object.assign(g, {moveLeft:false, moveRight:false, nitroHeld:false,
+      flyHeld:false, touching:false, touchTargetX:null});
+  },
+  x(event){
+    const rect = $('gameCanvas').getBoundingClientRect();
+    return (event.clientX - rect.left) * Game.W / rect.width;
+  },
+  bind(){
+    const canvas = $('gameCanvas');
+    canvas.addEventListener('pointerdown', e => {
+      const g = Game.g;
+      if(!g || g.state !== 'run' || Game.paused || this.steering !== null || e.button > 0) return;
+      e.preventDefault();
+      this.steering = e.pointerId;
+      this.originX = this.x(e); this.carX = g.px + g.pw / 2;
+      canvas.setPointerCapture(e.pointerId);
+      g.touching = true;
+      g.touchTargetX = S.settings.control === 'direct' ? this.originX : this.carX;
+    });
+    canvas.addEventListener('pointermove', e => {
+      const g = Game.g;
+      if(!g || Game.paused || e.pointerId !== this.steering) return;
+      g.touchTargetX = S.settings.control === 'direct' ? this.x(e) : this.carX + (this.x(e) - this.originX) * 1.25;
+    });
+    const release = e => {
+      if(e.pointerId !== this.steering) return;
+      this.steering = null;
+      if(Game.g){ Game.g.touching = false; Game.g.touchTargetX = null; }
+    };
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => canvas.addEventListener(type, release));
+    this.hold($('nitroBtn'), 'nitroHeld');
+    this.hold($('flyBtn'), 'flyHeld');
+    document.addEventListener('keydown', e => {
+      const g = Game.g;
+      if(!g || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+      if([' ', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+      const key = e.key.toLowerCase();
+      if((key === 'escape' || key === 'p') && !e.repeat){ Game.togglePause(); return; }
+      if(Game.paused || g.state !== 'run') return;
+      if(key === 'arrowleft' || key === 'a') g.moveLeft = true;
+      if(key === 'arrowright' || key === 'd') g.moveRight = true;
+      if([' ', 'arrowup', 'w'].includes(key)) g.nitroHeld = true;
+      if(['f', 'shift'].includes(key)) g.flyHeld = true;
+      const index = '123456'.indexOf(key);
+      if(index >= 0 && !e.repeat) Game.usePowerup(Game.PU_ORDER[index]);
+    });
+    document.addEventListener('keyup', e => {
+      const g = Game.g;
+      if(!g) return;
+      const key = e.key.toLowerCase();
+      if(['arrowleft', 'a'].includes(key)) g.moveLeft = false;
+      if(['arrowright', 'd'].includes(key)) g.moveRight = false;
+      if([' ', 'arrowup', 'w'].includes(key)) g.nitroHeld = false;
+      if(['f', 'shift'].includes(key)) g.flyHeld = false;
+    });
+  },
+  hold(button, property){
+    let owner = null;
+    button.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      const g = Game.g;
+      if(!g || Game.paused || g.state !== 'run' || owner !== null) return;
+      if(property === 'flyHeld' && !g.wingLv){ UI.toast('在改装车间装备飞翼后可起飞'); return; }
+      owner = e.pointerId;
+      button.setPointerCapture(owner);
+      g[property] = true;
+    });
+    const release = e => {
+      if(owner !== e.pointerId) return;
+      owner = null;
+      if(Game.g) Game.g[property] = false;
+    };
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => button.addEventListener(type, release));
+    button.addEventListener('contextmenu', e => e.preventDefault());
+  },
+};
 
-/* ---- 飞行按钮（长按） ---- */
-const flyBtn = $('flyBtn');
-flyBtn.addEventListener('pointerdown', e=>{
-  e.preventDefault();
-  const g = Game.g;
-  if(!g || g.state!=='run') return;
-  if(g.wingLv > 0) g.flyHeld = true;
-  else if(g.wingOwned) UI.toast('🪽 飞翼还没装备，去改装车间装配一下！');
-  else UI.toast('🪽 飞翼装置可在改装车间购买（💎18）');
+function suspendGame(){
+  Input.clear();
+  if(Game.g && !Game.paused && ['run', 'countdown'].includes(Game.g.state)) Game.togglePause();
+  AudioSys.stopMusic();
+  AudioSys.setEngine(0, false);
+}
+window.addEventListener('blur', suspendGame);
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden){ suspendGame(); MenuScene.stop(); Garage.close(); }
+  else if(UI.current === 'menuScreen') MenuScene.start();
+  else if(UI.current === 'garageScreen') Garage.open();
 });
-['pointerup','pointerleave','pointercancel'].forEach(ev=>{
-  flyBtn.addEventListener(ev, ()=>{
-    const g = Game.g;
-    if(g) g.flyHeld = false;
-  });
-});
-flyBtn.addEventListener('contextmenu', e=>e.preventDefault());
-
-/* ---- 暂停按钮 ---- */
-$('pauseBtn').addEventListener('click', e=>{ Game.togglePause(); e.currentTarget.blur(); });
-
-/* ---- 尺寸 ---- */
+window.addEventListener('pagehide', () => { suspendGame(); save(); });
+let resizeFrame = 0;
 function onResize(){
-  if(MenuScene.running) MenuScene.resize();
-  Game.resize();
+  cancelAnimationFrame(resizeFrame);
+  resizeFrame = requestAnimationFrame(() => {
+    if(MenuScene.running) MenuScene.resize();
+    Game.resize();
+  });
 }
 window.addEventListener('resize', onResize);
-if(window.visualViewport){
-  window.visualViewport.addEventListener('resize', onResize);
-}
-
-/* ---- 切后台自动暂停 ---- */
-document.addEventListener('visibilitychange', ()=>{
-  if(document.hidden && Game.g && UI.current==='gameScreen' && !Game.paused &&
-     (Game.g.state==='run' || Game.g.state==='countdown')){
-    Game.togglePause();
-  }
-});
-
-/* ---- 禁止下拉刷新 / 长按菜单 ---- */
-document.addEventListener('touchmove', e=>{
-  if(UI.current==='gameScreen' && Game.g) e.preventDefault();
-}, {passive:false});
-document.addEventListener('contextmenu', e=>e.preventDefault());
-document.addEventListener('gesturestart', e=>e.preventDefault());
-
-/* ---- 启动 ---- */
+if(window.visualViewport) window.visualViewport.addEventListener('resize', onResize);
+$('pauseBtn').addEventListener('click', e => { Game.togglePause(); e.currentTarget.blur(); });
+$('gameCanvas').addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('pointerdown', () => AudioSys.ensure(), {once:true});
 loadSave();
 ensureDaily();
+Input.bind();
 MenuScene.start();
 UI.updateMenu();
 UI.updateWallets();

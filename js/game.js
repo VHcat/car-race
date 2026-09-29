@@ -9,6 +9,9 @@ const Game = {
   /* ---------- 启动 ---------- */
   start(){
     if(!S.tutorialDone){ Tutorial.show(); return; }
+    clearTimeout(this.reviveTimeout);
+    Input.clear();
+    this.g = null;
     UI.go.call(UI, 'gameScreen');
     document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('active'));
     this.paused = false;
@@ -20,9 +23,8 @@ const Game = {
     const car = CARS[S.selectedCar];
     const up = S.upgrades[car.id] || {speed:0, accel:0, handling:0, nitro:0};
     const eff = k=>car[k] + up[k]*.6;
-    const laneW = clamp((this.W-56)/road.lanes, 54, 92);
-    const roadW = laneW*road.lanes;
-    const pw = laneW*.52, ph = pw*1.7;
+    const layout = RaceLayout.measure(this.W, this.H, road.lanes, this.dockHeight());
+    const {laneW, roadW, pw, ph} = layout;
     const startNitroBuff = S.buffs.startNitro > 0;
     const coinX2Buff = S.buffs.coinX2 > 0;
     /* 改装零件（仅已装备的生效） */
@@ -34,7 +36,7 @@ const Game = {
     this.g = {
       road, car, themeKey:road.theme, th:THEMES[road.theme],
       laneCount:road.lanes, laneW, roadW, roadX:(this.W-roadW)/2,
-      px: this.W/2 - pw/2, py: this.H - ph - 128, pw, ph,
+      px: this.W/2 - pw/2, py: layout.py, pw, ph,
       pSpeed:0, vx:0, tilt:0,
       maxSpeed: (3.1 + eff('speed')*.5) * (1+turboLv*.04),
       accelRate: .016 + eff('accel')*.0038,
@@ -70,7 +72,7 @@ const Game = {
     this.buildPuRow();
     this.updateHud(true);
     $('hudCombo').classList.remove('on');
-    $('flyBtn').hidden = false;
+    $('flyBtn').hidden = wingLv <= 0;
     $('flyBtn').classList.remove('flying');
     $('flyBtn').classList.toggle('locked', !wingOwned);
     $('flyBtn').classList.toggle('attn', wingLv > 0);
@@ -83,17 +85,19 @@ const Game = {
     const runRef = this.g;
     setTimeout(()=>{ if(this.g === runRef) $('touchHint').classList.remove('on'); }, wingLv > 0 ? 5200 : 3800);
     AudioSys.ensure();
+    AudioSys.startMusic();
     cancelAnimationFrame(this.raf);
-    this.lastTs = performance.now();
+    RaceClock.reset();
     const loop = ts=>{
       if(!this.g) return;
-      const dtRaw = clamp((ts - this.lastTs)/16.667, 0, 3);
-      this.lastTs = ts;
       if(!this.paused){
-        this.update(dtRaw);
+        RaceClock.advance(ts, dt => {
+          this.update(dt);
+          return !!this.g && !this.paused;
+        });
         if(!this.g) return;
         this.render();
-      }
+      } else RaceClock.reset(ts);
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
@@ -106,21 +110,26 @@ const Game = {
   },
 
   quit(){
+    Input.clear();
     cancelAnimationFrame(this.raf);
     this.g = null;
     this.paused = false;
     clearTimeout(this.reviveTimeout);
     document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('active'));
     AudioSys.setEngine(0, false);
+    AudioSys.stopMusic();
     UI.go('menuScreen');
   },
 
   togglePause(){
     if(!this.g || this.g.state==='dying' || this.g.state==='revive') return;
     this.paused = !this.paused;
+    Input.clear();
+    RaceClock.reset();
     $('pauseOverlay').classList.toggle('active', this.paused);
     AudioSys.click();
-    if(this.paused) AudioSys.setEngine(0, false);
+    if(this.paused){ AudioSys.setEngine(0, false); AudioSys.stopMusic(); }
+    else { AudioSys.ensure(); AudioSys.startMusic(); }
   },
 
   /* ---------- 道具栏 ---------- */
@@ -133,7 +142,8 @@ const Game = {
       const b = document.createElement('button');
       b.className = 'pu-btn';
       b.id = 'pu-'+id;
-      b.title = '快捷键 ' + (i+1);
+      b.title = SHOP_ITEMS.find(item => item.id === id).name + ' · 快捷键 ' + (i+1);
+      b.setAttribute('aria-label', b.title);
       b.innerHTML = `${this.PU_ICO[id]}<span class="cnt">0</span>`;
       b.addEventListener('click', ()=>this.usePowerup(id));
       row.appendChild(b);
@@ -148,6 +158,7 @@ const Game = {
       const cnt = S.powerups[id]||0;
       b.querySelector('.cnt').textContent = cnt;
       b.classList.toggle('zero', cnt<=0);
+      b.disabled = cnt <= 0;
       const lit = (id==='magnet'&&this.g.magnetTimer>0)||(id==='x2coin'&&this.g.x2Timer>0)||(id==='slowmo'&&this.g.slowTimer>0);
       b.classList.toggle('lit', lit);
     });
@@ -160,7 +171,10 @@ const Game = {
   usePowerup(id){
     const g = this.g;
     if(!g || g.state!=='run' || this.paused) return;
+    if(!this.PU_ORDER.includes(id)) return;
     if((S.powerups[id]||0) <= 0){ UI.toast('道具不足，去商店补充！'); return; }
+    if(id === 'fuel' && g.fuel >= g.fuelCap - 1){ UI.toast('油箱还是满的'); return; }
+    if(id === 'shield' && g.shield){ UI.toast('保护盾已经就绪'); return; }
     S.powerups[id]--;
     S.totalPower++;
     feed('power', 1);
@@ -304,7 +318,7 @@ const Game = {
       const adx = Math.abs(dx);
       const factor = adx>40 ? .85 : adx>10 ? .65 : adx>2 ? .45 : .25;
       const f = 1 - Math.pow(1-factor, dt);
-      if(adx > .5) g.px += dx*f;
+      if(adx > .5) g.px += clamp(dx*f, -handling*1.85*dt, handling*1.85*dt);
     } else {
       let dir = 0;
       if(g.moveLeft) dir--;
@@ -488,7 +502,7 @@ const Game = {
     if(g.x2Timer>0) g.x2Timer -= dt;
     if(g.slowTimer>0) g.slowTimer -= dt;
     if(g.invincibleTimer>0) g.invincibleTimer -= dt;
-    if(g.frame%20===0) this.updatePuRow();
+    if(g.frame%12===0) this.updatePuRow();
 
     /* ---- 敌车碰撞 ---- */
     if(g.invincibleTimer <= 0 && g.flyAlt < .35){
@@ -573,18 +587,12 @@ const Game = {
     const pool = [];
     ENEMY_TYPES.forEach(t=>{ for(let i=0;i<t.weight;i++) pool.push(t); });
     const type = pick(pool);
-    const w = type.w, h = type.h, y = -h-24;
+    const scale = g.laneW / 80;
+    const w = type.w*scale, h = type.h*scale, y = -h-24;
     const cx = g.roadX + lane*g.laneW + (g.laneW-w)/2;
-    /* 横向位置：车道内随机偏移，约 1/3 概率直接压线生成，覆盖所有可选位置 */
+    /* Keep traffic inside its declared lane to preserve the free-lane guarantee. */
     const maxOff = Math.max(4, (g.laneW-w)/2 - 2) * .7;
     let x = cx + rand(-maxOff, maxOff);
-    if(Math.random() < .35){
-      const side = Math.random()<.5 ? -1 : 1;
-      const nl = lane + side;
-      if(nl>=0 && nl<g.laneCount && !blocked.has(nl)){
-        x = g.roadX + (side>0 ? (lane+1)*g.laneW : lane*g.laneW) - w/2 + rand(-5,5);
-      }
-    }
     /* 顶部清空（按实际矩形判定，避免压线车互相重叠） */
     if(g.enemies.some(o=>o.y < 130 && rectOverlap(x, y, w, h, o.x, o.y, o.w, o.h))) return;
     const big = type.name==='truck' || type.name==='bus';
@@ -689,6 +697,8 @@ const Game = {
   /* ---------- 死亡 / 复活 / 结算 ---------- */
   die(reason){
     const g = this.g;
+    if(!g || g.state !== 'run') return;
+    Input.clear();
     g.state = 'dying';
     g.dieReason = reason;
     g.dieT = 55;
@@ -728,7 +738,8 @@ const Game = {
     if(!g || g.state!=='revive') return;
     const cost = this.reviveCost();
     if(mode==='coins'){ if(S.coins < cost) return; S.coins -= cost; }
-    else { if(S.gems < 5) return; S.gems -= 5; }
+    else if(mode === 'gems'){ if(S.gems < 5) return; S.gems -= 5; }
+    else return;
     clearTimeout(this.reviveTimeout);
     g.reviveUsed = true;
     $('reviveOverlay').classList.remove('active');
@@ -738,6 +749,8 @@ const Game = {
     g.invincibleTimer = 130;
     g.fuel = Math.max(g.fuel, 40);
     g.nitro = Math.max(g.nitro, 50);
+    Input.clear();
+    RaceClock.reset();
     g.lowWarn25 = g.fuel<=25; g.lowWarn10 = g.fuel<=10;
     save();
     AudioSys.revive();
@@ -753,14 +766,20 @@ const Game = {
   },
   finishRun(){
     const g = this.g;
+    if(!g || g.settled) return;
+    g.settled = true;
+    clearTimeout(this.reviveTimeout);
+    Input.clear();
+    AudioSys.setEngine(0, false);
+    AudioSys.stopMusic();
     const dist = Math.floor(g.distance);
     S.totalDistance += dist;
-    S.totalCoins += g.coins;
     S.totalDodge += g.dodgeCount;
     S.totalNear += g.nearCount;
     S.totalRam += g.ramCount;
     const completionBonus = Math.floor(20 + dist/50);
-    g.coins += completionBonus;
+    g.coins = Math.floor(g.coins + completionBonus);
+    S.totalCoins += g.coins;
     S.coins += g.coins;
     feed('dist', dist);
     let record = false;
@@ -772,7 +791,7 @@ const Game = {
     save();
 
     $('goStamp').textContent = g.dieReason==='fuel' ? '没油了!' : '撞车了!';
-    $('goReason').textContent = g.dieReason==='fuel' ? '下次记得在检查站之间捡油桶' : '小心那些不打灯就变道的家伙';
+    $('goReason').textContent = g.dieReason==='fuel' ? '记得点击备用油箱补油，检查站也有补给' : '留意来车转向灯，预留一点躲避空间';
     $('goBest').textContent = fmt(S.bestDistance) + ' m';
     $('goRecord').classList.toggle('on', record);
     $('goXp').textContent = `+${fmt(xp)} 经验` + (ups>0 ? ` · 升级至 LV.${S.level}！` : ` · LV.${S.level} ${levelTitle(S.level)}`);
@@ -815,6 +834,7 @@ const Game = {
   updateHud(force){
     const g = this.g;
     if(!g) return;
+    if(!force && g.frame % 6 !== 0) return;
     $('hudSpeed').textContent = Math.floor(g.pSpeed*28);
     $('hudDist').textContent = fmt(g.distance);
     $('hudCoins').textContent = fmt(g.coins);
@@ -1291,11 +1311,15 @@ const Game = {
   },
 
   /* ---------- 尺寸 ---------- */
+  dockHeight(){
+    return Math.max(120, document.querySelector('.hud-bottom').getBoundingClientRect().height);
+  },
   resize(){
-    const vv = window.visualViewport;
-    this.W = vv ? vv.width : innerWidth;
-    this.H = vv ? vv.height : innerHeight;
-    this.dpr = Math.min(devicePixelRatio||1, 2);
+    const oldHeight = this.H || innerHeight;
+    const rect = $('gameCanvas').getBoundingClientRect();
+    this.W = rect.width || innerWidth;
+    this.H = rect.height || innerHeight;
+    this.dpr = S.settings.quality === 'low' ? 1 : Math.min(devicePixelRatio||1, 2);
     if(this.cv && this.ctx){
       this.cv.width = this.W*this.dpr;
       this.cv.height = this.H*this.dpr;
@@ -1303,14 +1327,8 @@ const Game = {
     }
     const g = this.g;
     if(g){
-      g.roadX = (this.W - g.roadW)/2;
-      g.py = this.H - g.ph - 128;
-      g.px = clamp(g.px, g.roadX+4, g.roadX+g.roadW-g.pw-4);
-      /* 路面平移后把敌车吸回车道中心线，清除进行中的变道状态 */
-      for(const e of g.enemies){
-        e.x = g.roadX + e.lane*g.laneW + (g.laneW-e.w)/2;
-        e.targetX = undefined; e.pendingX = undefined; e.changeDelay = undefined; e.blink = 0;
-      }
+      RaceLayout.remap(g, RaceLayout.measure(this.W, this.H, g.laneCount, this.dockHeight()), oldHeight, this.H);
+      Input.clear();
     }
   },
 };

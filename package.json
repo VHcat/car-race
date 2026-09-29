@@ -1,0 +1,11 @@
+{
+  "name": "come-on-racing",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Mobile-first, offline-ready arcade racer",
+  "scripts": {
+    "test": "node --test tests/core.test.cjs",
+    "serve": "node tools/serve.cjs",
+    "test:browser": "node tests/browser.cjs"
+  }
+}
