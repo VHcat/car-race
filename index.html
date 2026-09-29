@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="来呀！赛车">
@@ -11,69 +11,37 @@
 <meta name="format-detection" content="telephone=no">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏎️</text></svg>">
 <title>Come on! Racing - 来呀！赛车</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Racing+Sans+One&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-<div id="toastWrap"></div>
+<div id="toastWrap" role="status" aria-live="polite"></div>
 <div id="bannerEl"></div>
 
 <!-- ================= MAIN MENU ================= -->
-<div class="screen active" id="menuScreen">
-  <canvas id="menuCanvas"></canvas>
+<main class="screen active" id="menuScreen">
   <div class="menu-layer">
-    <div class="menu-top">
-      <div class="plate pilot-plate">
-        <span class="lv" id="menuLv">LV.1</span>
-        <span class="tt" id="menuTitle">新手司机</span>
-        <span class="xpbar"><i id="menuXpBar"></i></span>
-      </div>
-      <div class="menu-wallet">
-        <span class="chip chip-gold">🪙 <span class="num" id="menuCoins">0</span></span>
-        <span class="chip chip-purple">💎 <span class="num" id="menuGems">0</span></span>
-      </div>
-    </div>
-    <div class="title-lockup">
-      <span class="tl-kicker"><i class="flag"></i>ARCADE RACER<i class="flag"></i></span>
-      <h1 class="tl-main">COME ON!<em>RACING</em></h1>
-      <span class="tl-cn">来呀！赛车</span>
-    </div>
-    <nav class="pit-lane">
-      <button class="pit-btn pit-start" onclick="UI.go('roadScreen')">
-        <span class="pb-ico">🏁</span>
-        <span class="pb-txt"><b>开始比赛</b><i id="menuTrackName">乡村公路 · 最佳 0m</i></span>
-        <span class="pb-arrow">›</span>
-        <i class="checker-strip"></i>
-      </button>
-      <button class="pit-btn" onclick="UI.go('garageScreen')">
-        <span class="pb-ico">🔧</span><span class="pb-txt"><b>车库</b><i>选车 · 改装升级</i></span><span class="pb-arrow">›</span>
-      </button>
-      <button class="pit-btn" onclick="UI.go('modScreen')">
-        <span class="pb-ico">🔩</span><span class="pb-txt"><b>改装车间</b><i>零件 · 飞翼装置</i></span><span class="pb-arrow">›</span>
-      </button>
-      <button class="pit-btn" onclick="UI.go('shopScreen')">
-        <span class="pb-ico">🛒</span><span class="pb-txt"><b>商店</b><i>道具 · 增益卡</i></span><span class="pb-arrow">›</span>
-      </button>
-      <button class="pit-btn" onclick="UI.go('bankScreen')">
-        <span class="pb-ico">🎰</span><span class="pb-txt"><b>幸运转盘</b><i>每日免费一转</i></span><span class="pb-arrow">›</span>
-      </button>
-      <button class="pit-btn" onclick="UI.go('rewardScreen')">
-        <span class="pb-ico">🎁</span><span class="pb-txt"><b>签到奖励</b><i>14天豪礼</i></span><span class="pb-arrow">›</span>
-        <em class="dot" id="rewardDot" hidden></em>
-      </button>
-      <button class="pit-btn" onclick="UI.go('missionScreen')">
-        <span class="pb-ico">📋</span><span class="pb-txt"><b>任务中心</b><i>每日任务 · 成就</i></span><span class="pb-arrow">›</span>
-        <em class="dot" id="missionDot" hidden></em>
-      </button>
-      <button class="pit-btn" onclick="UI.go('settingsScreen')">
-        <span class="pb-ico">⚙️</span><span class="pb-txt"><b>设置</b><i>音效 · 画质</i></span><span class="pb-arrow">›</span>
-      </button>
+    <header class="menu-top">
+      <div class="brand"><span class="brand-mark">↗</span><div>COME ON!<small>RACING CLUB / 03</small></div></div>
+      <div class="menu-wallet"><span class="chip chip-gold"><span aria-hidden="true">◈</span> <span id="menuCoins">0</span></span><span class="chip chip-purple">◆ <span id="menuGems">0</span></span></div>
+    </header>
+    <section class="menu-hero">
+      <div class="title-lockup"><span class="tl-kicker"><i></i> THE ROAD IS YOURS</span><h1>COME ON!<em>RACING.</em></h1><p>下一程，突破自己。</p></div>
+      <div class="hero-art"><canvas id="menuCanvas" aria-label="当前赛车动态预览"></canvas><div class="hero-route"><span class="live-dot"></span> READY TO ROLL<span id="heroCarName">运动跑车</span></div><span class="hero-number">01</span></div>
+      <div class="pilot-row"><div><span class="lv" id="menuLv">LV.1</span><span id="menuTitle">新手司机</span></div><div class="xpbar"><i id="menuXpBar"></i></div><span class="pilot-caption">KEEP PUSHING ↗</span></div>
+    </section>
+    <nav class="pit-lane" aria-label="游戏菜单">
+      <button class="pit-btn pit-start" onclick="UI.go('roadScreen')"><span class="pb-txt"><b>即刻出发</b><i id="menuTrackName">乡村公路 · 最佳 0m</i></span><span class="start-arrow">↗</span></button>
+      <div class="section-label"><span>你的维修站</span><span>PIT STOP / 01</span></div>
+      <button class="pit-btn" onclick="UI.go('garageScreen')"><span class="pb-ico">▰</span><span class="pb-txt"><b>车库</b><i>选车 · 性能升级</i></span><span class="pb-arrow">↗</span></button>
+      <button class="pit-btn" onclick="UI.go('modScreen')"><span class="pb-ico">✣</span><span class="pb-txt"><b>改装</b><i>飞翼 · 自由装配</i></span><span class="pb-arrow">↗</span></button>
+      <button class="pit-btn" onclick="UI.go('shopScreen')"><span class="pb-ico">▣</span><span class="pb-txt"><b>补给站</b><i>为下一场做准备</i></span><span class="pb-arrow">↗</span></button>
+      <button class="pit-btn" onclick="UI.go('missionScreen')"><span class="pb-ico">⚑</span><span class="pb-txt"><b>挑战</b><i>每日任务 · 成就</i></span><em class="dot" id="missionDot" hidden></em><span class="pb-arrow">↗</span></button>
+      <div class="menu-links"><button onclick="UI.go('rewardScreen')">每日签到 <em class="dot" id="rewardDot" hidden></em></button><button onclick="UI.go('bankScreen')">幸运转盘</button><button onclick="UI.go('settingsScreen')">设置 <span>⚙</span></button></div>
+      <div class="menu-footer"><span>街头见，车手。</span><span>NO LIMITS. JUST DRIVE.</span></div>
     </nav>
   </div>
-</div>
+</main>
 <!-- ================= ROAD SELECT ================= -->
 <div class="screen subscreen" id="roadScreen">
   <div class="sub-head">
@@ -81,7 +49,7 @@
     <h2>选择赛道</h2>
     <span class="chip chip-gold">🪙 <span class="num" id="roadCoins">0</span></span>
   </div>
-  <div class="scroll-area"><div class="road-grid" id="roadGrid"></div></div>
+  <div class="scroll-area"><div class="track-intro"><span>CHOOSE YOUR ROUTE</span><h3>挑一条路，出发。</h3><p>六种风景，一路向前。难度越高，金币奖励越多。</p></div><div id="modePicker"></div><div class="road-grid" id="roadGrid"></div></div>
   <div class="buff-row" id="buffRow"></div>
   <div class="go-bar">
     <button class="rbtn rbtn-red" onclick="Game.start()">🏁 <span>出发</span></button>
@@ -91,30 +59,32 @@
 
 <!-- ================= GAME ================= -->
 <div class="screen" id="gameScreen">
-  <canvas id="gameCanvas"></canvas>
+  <canvas id="gameCanvas" aria-label="赛车赛道，左右拖动转向"></canvas>
   <div class="hud">
     <div class="hud-top">
       <div>
         <div class="hud-speed"><span id="hudSpeed">0</span><small> km/h</small></div>
-        <div class="hud-dist">📏 <span id="hudDist">0</span> m</div>
+        <div class="hud-dist"><span id="hudDist">0</span> <small>METERS</small></div>
       </div>
       <div class="hud-right">
-        <button class="hud-pause" id="pauseBtn">⏸</button>
+        <button class="hud-pause" id="pauseBtn" aria-label="暂停比赛">Ⅱ</button>
         <span class="chip chip-gold">🪙 <span class="num" id="hudCoins">0</span></span>
         <span class="chip">⭐ <span class="num" id="hudScore">0</span></span>
       </div>
     </div>
+    <div class="race-progress"><div><span id="hudRoute">乡村公路</span><span id="hudNext">500m 后补给</span></div><div class="race-progress-track"><i id="checkpointFill"></i></div></div>
     <div id="hudCombo">连击 x3</div>
+    <div id="hudChallenge" class="hud-challenge"></div>
     <div class="hud-bottom">
       <div class="fuel-wrap">
         <span class="fi">⛽</span>
         <div class="fuel-track" id="fuelTrack"><i id="fuelFill"></i></div>
         <span class="fuel-num" id="fuelNum">100</span>
       </div>
-      <div class="hud-dock">
-        <button class="nitro-btn" id="nitroBtn"><span>NOS</span></button>
-        <div class="pu-row" id="puRow"></div>
-        <button class="fly-btn" id="flyBtn" hidden><span>FLY</span></button>
+      <div class="pu-row" id="puRow"></div>
+      <div class="hud-dock"><div class="steer-guide"><span>‹ &nbsp; ↔ &nbsp; ›</span><small>左右拖动 · 自由转向</small></div>
+        <button class="nitro-btn" id="nitroBtn" aria-label="长按氮气加速"><span>NOS<small>长按加速</small></span></button>
+        <button class="fly-btn" id="flyBtn" aria-label="长按飞翼起飞" hidden><span>FLY<small>长按飞行</small></span></button>
         <div class="hud-side">
           <span id="hudShieldIco">🛡️</span>
           <span class="hud-mini" id="hudX2">✖2</span>
@@ -247,6 +217,8 @@
     <span style="width:64px"></span>
   </div>
   <div class="set-list">
+    <div class="set-row"><label>转向方式<small>相对拖动不会在按下时跳车</small></label><div class="seg"><button id="controlRelative" onclick="Settings.control('relative')">拖动</button><button id="controlDirect" onclick="Settings.control('direct')">跟手</button></div></div>
+    <div class="set-row"><label>减少动态效果<small>关闭画面震动与速度线</small></label><button class="switch" id="swReduced" aria-label="减少动态效果" onclick="Settings.toggle('reducedMotion','swReduced')"></button></div>
     <div class="set-row">
       <label>🔊 音效<small>碰撞、金币、氮气等提示音</small></label>
       <button class="switch on" id="swSound" onclick="Settings.toggle('sound','swSound')"></button>
@@ -270,7 +242,7 @@
       <button class="rbtn rbtn-red rbtn-sm" onclick="Settings.confirmReset()"><span>🗑️ 重置所有数据</span></button>
     </div>
   </div>
-  <div class="set-about">Come on! Racing v2.1<br>纯前端 · 零依赖 · 进度自动保存在本地</div>
+  <div class="set-about">Come on! Racing v3.0<br>纯前端 · 零依赖 · 进度自动保存在本地</div>
 </div>
 
 <!-- ================= GAME OVER ================= -->
@@ -286,6 +258,7 @@
       <div class="go-row"><span>🏆 历史最佳</span><b id="goBest">0 m</b></div>
     </div>
     <div class="go-record" id="goRecord">🎉 新纪录！</div>
+    <div id="goRunDetails" class="run-details"></div>
     <div class="go-xp" id="goXp"></div>
     <div class="go-btns">
       <button class="rbtn rbtn-red" onclick="Game.start()"><span>🔄 再来一次</span></button>
@@ -349,7 +322,9 @@
 <script src="js/audio.js"></script>
 <script src="js/car.js"></script>
 <script src="js/runtime.js"></script>
+<script src="js/menu-scene.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/renderer.js"></script>
 <script src="js/game.js"></script>
 <script src="js/main.js"></script>
 </body>

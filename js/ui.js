@@ -54,6 +54,7 @@ const UI = {
     const road = ROADS[S.selectedRoad];
     const best = S.bestPerRoad[road.id] || 0;
     $('menuTrackName').textContent = `${road.name} · 最佳 ${fmt(best)}m`;
+    $('heroCarName').textContent = CARS[S.selectedCar].name;
     ensureDaily();
     $('rewardDot').hidden = !(S.rewardDay < 14 && S.lastRewardDate !== todayStr());
     $('missionDot').hidden = !Missions.anyClaimable();
@@ -65,11 +66,12 @@ const UI = {
     ROADS.forEach(r=>{
       const th = THEMES[r.theme];
       const best = S.bestPerRoad[r.id] || 0;
-      const card = document.createElement('div');
+      const card = document.createElement('button');
+      card.setAttribute('aria-pressed', S.selectedRoad === r.id);
       card.className = 'road-card' + (S.selectedRoad===r.id ? ' selected' : '');
       card.innerHTML = `
         <div class="rc-scene" style="background:linear-gradient(180deg, ${th.skyTop}, ${th.skyBot} 58%, ${th.ground} 58%, ${th.groundDark})">
-          <i class="rc-dash"></i><span class="rc-emoji">${r.emoji}</span>
+          <canvas aria-hidden="true"></canvas>
         </div>
         <div class="rc-body">
           <div class="rc-name">${r.name}</div>
@@ -82,6 +84,7 @@ const UI = {
         </div>`;
       card.addEventListener('click', ()=>{ S.selectedRoad = r.id; save(); this.updateRoad(); AudioSys.click(); });
       grid.appendChild(card);
+      TrackPreview.draw(card.querySelector('canvas'), r);
     });
     const buffs = $('buffRow');
     buffs.innerHTML = '';
@@ -113,139 +116,6 @@ const UI = {
       this.toast(`🎉 升级！LV.${S.level} · ${levelTitle(S.level)}  奖励 🪙${totalBonus}`);
     }
     return ups;
-  },
-};
-
-/* ================= 主菜单动态场景 ================= */
-const MenuScene = {
-  running:false, raf:0, last:0, scroll:0, t:0,
-  clouds:[], passers:[], puffs:[],
-  cv:null, ctx:null, W:0, H:0,
-  start(){
-    this.cv = $('menuCanvas');
-    this.ctx = this.cv.getContext('2d');
-    this.resize();
-    if(!this.clouds.length){
-      for(let i=0;i<5;i++) this.clouds.push({x:Math.random()*this.W, y:this.H*rand(.06,.3), s:rand(.6,1.3), v:rand(.08,.25)});
-    }
-    if(this.running) return;
-    this.running = true;
-    this.last = performance.now();
-    const loop = ts=>{
-      if(!this.running) return;
-      const dt = clamp((ts - this.last)/16.667, 0, 3);
-      this.last = ts;
-      this.t += dt*16.667;
-      this.draw(dt);
-      this.raf = requestAnimationFrame(loop);
-    };
-    this.raf = requestAnimationFrame(loop);
-  },
-  stop(){ this.running = false; cancelAnimationFrame(this.raf); },
-  resize(){
-    const dpr = Math.min(devicePixelRatio||1, 2);
-    this.W = innerWidth; this.H = innerHeight;
-    this.cv.width = this.W*dpr; this.cv.height = this.H*dpr;
-    this.ctx.setTransform(dpr,0,0,dpr,0,0);
-  },
-  draw(dt){
-    const c = this.ctx, W = this.W, H = this.H;
-    const horY = H*.42;
-    /* 黄昏天空 */
-    const sky = c.createLinearGradient(0,0,0,horY);
-    sky.addColorStop(0,'#14213d'); sky.addColorStop(.55,'#31456e'); sky.addColorStop(.85,'#c96f3b'); sky.addColorStop(1,'#f5af19');
-    c.fillStyle = sky; c.fillRect(0,0,W,horY);
-    /* 落日 */
-    const sunX = W*.72, sunY = horY - H*.045;
-    const sg = c.createRadialGradient(sunX,sunY,4,sunX,sunY,H*.14);
-    sg.addColorStop(0,'rgba(255,214,120,.95)'); sg.addColorStop(.35,'rgba(255,170,80,.5)'); sg.addColorStop(1,'rgba(255,170,80,0)');
-    c.fillStyle = sg; c.fillRect(sunX-H*.15, sunY-H*.15, H*.3, H*.3);
-    c.fillStyle = '#ffd58a';
-    c.beginPath(); c.arc(sunX, sunY, H*.028, 0, Math.PI*2); c.fill();
-    /* 云 */
-    c.fillStyle = 'rgba(255,220,190,.5)';
-    this.clouds.forEach(cl=>{
-      cl.x += cl.v*dt;
-      if(cl.x > W+80) cl.x = -80;
-      c.beginPath();
-      c.ellipse(cl.x, cl.y, 46*cl.s, 13*cl.s, 0, 0, Math.PI*2);
-      c.ellipse(cl.x+30*cl.s, cl.y+5*cl.s, 30*cl.s, 10*cl.s, 0, 0, Math.PI*2);
-      c.fill();
-    });
-    /* 远山剪影 */
-    c.fillStyle = '#1d2c47';
-    c.beginPath(); c.moveTo(0,horY);
-    for(let x=0;x<=W;x+=W/6){
-      c.lineTo(x + W/12, horY - H*.05 - Math.sin(x*.013+2)*H*.03);
-      c.lineTo(x + W/6, horY - H*.015);
-    }
-    c.lineTo(W,horY); c.closePath(); c.fill();
-    /* 地面 */
-    c.fillStyle = '#17202c'; c.fillRect(0,horY,W,H-horY);
-    c.fillStyle = 'rgba(255,255,255,.03)';
-    for(let i=0;i<8;i++) c.fillRect(0, horY + (H-horY)*i/8, W, 1);
-    /* 公路（透视梯形） */
-    const roadTopW = W*.09, roadBotW = W*.72;
-    const cx = W*.5;
-    c.fillStyle = '#262c36';
-    c.beginPath();
-    c.moveTo(cx-roadTopW/2, horY); c.lineTo(cx+roadTopW/2, horY);
-    c.lineTo(cx+roadBotW/2, H); c.lineTo(cx-roadBotW/2, H);
-    c.closePath(); c.fill();
-    /* 路缘警示条 */
-    c.strokeStyle = '#f7b731'; c.lineWidth = 3;
-    c.beginPath(); c.moveTo(cx-roadTopW/2, horY); c.lineTo(cx-roadBotW/2, H); c.stroke();
-    c.beginPath(); c.moveTo(cx+roadTopW/2, horY); c.lineTo(cx+roadBotW/2, H); c.stroke();
-    /* 滚动虚线 */
-    this.scroll = (this.scroll + dt*7) % 60;
-    c.strokeStyle = 'rgba(244,244,239,.85)';
-    for(let i=0;i<12;i++){
-      const p = (i*60 + this.scroll*3)/ (H-horY+120);
-      if(p<0 || p>1) continue;
-      const y = horY + p*(H-horY);
-      const wAt = lerp(roadTopW, roadBotW, p);
-      const hh = lerp(2, 26, p*p);
-      c.lineWidth = lerp(1, 5, p);
-      c.beginPath();
-      c.moveTo(cx, y); c.lineTo(cx, y+hh);
-      c.stroke();
-      void wAt;
-    }
-    /* 偶尔掠过的车灯 */
-    if(Math.random() < .004*dt && this.passers.length < 2){
-      this.passers.push({p:0, lane:Math.random()<.5?-1:1, v:rand(.004,.007)});
-    }
-    this.passers = this.passers.filter(pa=>{
-      pa.p += pa.v*dt;
-      if(pa.p > 1) return false;
-      const y = horY + pa.p*(H-horY);
-      const wAt = lerp(roadTopW, roadBotW, pa.p);
-      const x = cx + pa.lane*wAt*.28;
-      const s = lerp(.25, 1, pa.p);
-      c.fillStyle = 'rgba(255,240,180,'+(.8*pa.p)+')';
-      c.beginPath(); c.arc(x-8*s, y, 4*s, 0, Math.PI*2); c.arc(x+8*s, y, 4*s, 0, Math.PI*2); c.fill();
-      c.fillStyle = 'rgba(20,24,32,'+(.9*pa.p)+')';
-      c.fillRect(x-13*s, y-20*s, 26*s, 20*s);
-      return true;
-    });
-    /* 玩家车（底部居中，微颤 + 大灯光晕） */
-    const car = CARS[S.selectedCar];
-    const cw = clamp(W*.13, 54, 84), ch = cw*1.72;
-    const carX = cx - cw/2, carY = H - ch - H*.06 + Math.sin(this.t*.004)*2;
-    const hg = c.createRadialGradient(cx, carY, 4, cx, carY, ch*.9);
-    hg.addColorStop(0,'rgba(255,240,180,.28)'); hg.addColorStop(1,'rgba(255,240,180,0)');
-    c.fillStyle = hg;
-    c.beginPath(); c.ellipse(cx, carY - ch*.2, cw*1.1, ch*.8, 0, 0, Math.PI*2); c.fill();
-    drawCar(c, carX, carY, cw, ch, car, {sparkle:this.t*.002});
-    /* 尾气 */
-    if(Math.random() < .12*dt) this.puffs.push({x:cx + rand(-6,6), y:carY+ch+2, r:rand(2,4), a:.5});
-    this.puffs = this.puffs.filter(p=>{
-      p.y += .6*dt; p.r += .12*dt; p.a -= .02*dt;
-      if(p.a <= 0) return false;
-      c.fillStyle = `rgba(160,170,185,${p.a})`;
-      c.beginPath(); c.arc(p.x, p.y, p.r, 0, Math.PI*2); c.fill();
-      return true;
-    });
   },
 };
 
@@ -702,16 +572,27 @@ const Missions = {
 /* ================= 设置 ================= */
 const Settings = {
   render(){
+    document.body.classList.toggle('reduced-motion', S.settings.reducedMotion);
+    $('swReduced').classList.toggle('on', S.settings.reducedMotion);
+    $('controlRelative').classList.toggle('active', S.settings.control === 'relative');
+    $('controlDirect').classList.toggle('active', S.settings.control === 'direct');
     $('swSound').classList.toggle('on', S.settings.sound);
     $('swMusic').classList.toggle('on', S.settings.music);
     $('swVibrate').classList.toggle('on', S.settings.vibrate);
     $('qHigh').classList.toggle('active', S.settings.quality==='high');
     $('qLow').classList.toggle('active', S.settings.quality==='low');
+    document.querySelectorAll('.switch').forEach(button => {
+      button.setAttribute('role', 'switch');
+      button.setAttribute('aria-checked', button.classList.contains('on'));
+      button.setAttribute('aria-label', button.closest('.set-row').querySelector('label').firstChild.textContent);
+    });
   },
+  control(mode){ S.settings.control = mode; save(); this.render(); },
   toggle(key, btnId){
     S.settings[key] = !S.settings[key];
     save();
     $(btnId).classList.toggle('on', S.settings[key]);
+    this.render();
     if(key==='music'){
       if(S.settings.music) AudioSys.startMusic();
       else AudioSys.stopMusic();
@@ -736,7 +617,7 @@ const Settings = {
 const Tutorial = {
   step:0,
   steps:[
-    {ico:'👆', title:'车辆控制', body:'<b>触屏</b>：手指左右拖动，赛车紧跟指尖<br><b>键盘</b>：A / D 或 ← → 转向'},
+    {ico:'👆', title:'拇指就是方向盘', body:'在赛道任意位置<b>左右拖动</b>即可转向<br>按下时赛车不会跳动，手指也不会挡住车<br><b>键盘</b>：A / D 或 ← → 转向'},
     {ico:'⚡', title:'险胜超车', body:'紧贴来车擦身而过触发<b>「险胜」</b><br>奖励：+氮气 +连击 +额外得分<br>连续险胜叠加倍率，越大胆越强！'},
     {ico:'🚀', title:'氮气与油量', body:'<b>长按 NOS</b> 释放氮气：加速、撞飞来车<br>油量会持续消耗，检查站可补油<br>合理使用氮气，别在没油前浪费！'},
   ],

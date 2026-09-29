@@ -110,6 +110,7 @@ $('pauseBtn').addEventListener('click', e => { Game.togglePause(); e.currentTarg
 $('gameCanvas').addEventListener('contextmenu', e => e.preventDefault());
 document.addEventListener('pointerdown', () => AudioSys.ensure(), {once:true});
 loadSave();
+document.body.classList.toggle('reduced-motion', S.settings.reducedMotion);
 ensureDaily();
 Input.bind();
 MenuScene.start();

@@ -92,6 +92,7 @@ const AudioSys = {
   startMusic(){
     if(!this.ensure() || this.musicOn) return;
     if(!S.settings.music) return;
+    this.musG.gain.setTargetAtTime(.15,this.ctx.currentTime,.05);
     this.musicOn = true; this.mStep=0; this.mNext=this.ctx.currentTime+.06;
     const stepDur = 60/132/2;
     const bass=[110,0,110,110, 0,110,0,131, 147,0,147,147, 0,165,0,196];
@@ -123,7 +124,15 @@ const AudioSys = {
       }
     }, 90);
   },
-  stopMusic(){ this.musicOn=false; if(this.musicTimer){ clearInterval(this.musicTimer); this.musicTimer=null; } },
+  stopMusic(){
+    this.musicOn=false;
+    if(this.musG) this.musG.gain.setTargetAtTime(0,this.ctx.currentTime,.03);
+    if(this.musicTimer){ clearInterval(this.musicTimer); this.musicTimer=null; }
+  },
 };
-document.addEventListener('pointerdown', function audioWake(){ AudioSys.ensure(); AudioSys.startMusic(); }, {once:false});
-document.addEventListener('keydown', function audioWake2(){ AudioSys.ensure(); AudioSys.startMusic(); }, {once:false});
+function audioWake(){
+  AudioSys.ensure();
+  if(!Game.paused && (!Game.g || !['dying','revive'].includes(Game.g.state))) AudioSys.startMusic();
+}
+document.addEventListener('pointerdown', audioWake);
+document.addEventListener('keydown', audioWake);
